@@ -10,12 +10,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Estilos personalizados
 st.markdown("""
     <style>
     .main-header { font-size: 2.2rem; color: #1F4E79; font-weight: 700; text-align: center; margin-bottom: 0px; }
     .author-header { font-size: 1.25rem; color: #0D5C75; font-weight: 600; text-align: center; margin-top: 5px; margin-bottom: 5px; }
     .sub-header { font-size: 1.05rem; color: #595959; text-align: center; margin-bottom: 25px; }
     .stButton>button { font-weight: bold; border-radius: 6px; }
+    div[data-testid="stSidebar"] button { text-align: left; margin-bottom: 2px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -36,26 +38,50 @@ def matrix_to_latex(arr):
         lines.append(" & ".join([f"{x:.4f}".rstrip('0').rstrip('.') for x in row]))
     return r"\begin{bmatrix}" + " \\\\ ".join(lines) + r"\end{bmatrix}"
 
+def generar_matriz_con_dos_ceros_fuera_diag():
+    while True:
+        m = np.random.randint(-5, 6, size=(3, 3))
+        np.fill_diagonal(m, np.random.randint(1, 6, size=3) * np.random.choice([-1, 1], size=3))
+        off_diag_indices = [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
+        zeros_idx = np.random.choice(len(off_diag_indices), size=2, replace=False)
+        for idx in zeros_idx:
+            r, c = off_diag_indices[idx]
+            m[r, c] = 0
+        non_zeros_off = sum(1 for (r, c) in off_diag_indices if m[r, c] == 0)
+        if non_zeros_off == 2 and int(round(np.linalg.det(m))) != 0:
+            return m.astype(float)
+
 # ==========================================
 # ÁLGEBRA LINEAL
 # ==========================================
 if asignatura == "Álgebra Lineal":
-    st.sidebar.markdown("---")
-    tema_al = st.sidebar.selectbox("Seleccione Tema de Álgebra Lineal:", [
+    temas_al_lista = [
         "Vectores en el plano (Punto y Proyecciones)",
         "Vectores en el espacio (Cruz y Proyecciones)",
-        "Suma de Matrices (≥ 9 elementos)",
-        "Multiplicación de Matrices (≥ 7 elementos)",
+        "Suma de Matrices (Verificación Completa)",
+        "Multiplicación de Matrices (Verificación Completa)",
         "Determinantes (Tamaño mínimo 4x4)",
-        "Cálculo de la Matriz Inversa a través de la Adjunta (≥ 3x3)",
-        "Método de Gauss-Jordán (Sistema 3x3)",
+        "Cálculo de la Matriz Inversa (Verificación Completa 3x3)",
+        "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)",
         "Regla de Cramer (Sistema 3x3)",
-        "Factorización LU por Crout (Sistema 3x3)",
-        "Método Gauss-Seidel (Sistema 3x3)",
+        "Factorización LU por Doolittle (Sistema 3x3)",
+        "Método Gauss-Seidel (Verificación 3ra Iteración)",
         "Independencia Lineal (Subespacios)",
-        "Método del Polinomio Característico (≥ 3x3)"
-    ])
+        "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)"
+    ]
     
+    if "tema_al" not in st.session_state:
+        st.session_state.tema_al = temas_al_lista[0]
+        
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎯 Seleccione un Tema (Botones):")
+    for t in temas_al_lista:
+        btn_label = f"👉 {t}" if st.session_state.tema_al == t else t
+        if st.sidebar.button(btn_label, key=f"btn_al_{t}", use_container_width=True):
+            st.session_state.tema_al = t
+            st.rerun()
+            
+    tema_al = st.session_state.tema_al
     st.markdown(f"## 📐 Álgebra Lineal — {tema_al}")
     
     # 1. Vectores Plano
@@ -130,7 +156,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Respuesta Incorrecta. ❌\n- Producto Cruz exacto: [{cruz[0]}, {cruz[1]}, {cruz[2]}]\n- Proyección exacta: [{proj[0]:.4f}, {proj[1]:.4f}, {proj[2]:.4f}]")
 
     # 3. Suma de Matrices
-    elif tema_al == "Suma de Matrices (≥ 9 elementos)":
+    elif tema_al == "Suma de Matrices (Verificación Completa)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_m_a_sum" not in st.session_state:
             st.session_state.al_m_a_sum = np.random.randint(-5, 6, size=(3, 3))
             st.session_state.al_m_b_sum = np.random.randint(-5, 6, size=(3, 3))
@@ -139,22 +165,27 @@ if asignatura == "Álgebra Lineal":
         A = st.session_state.al_m_a_sum
         B = st.session_state.al_m_b_sum
         
-        st.info("💡 **Instrucción:** Dadas las matrices $A$ y $B$ de $3 \\times 3$, calcule la suma $S = A + B$ e ingrese los elementos indicados.")
+        st.info("💡 **Instrucción:** Dadas las matrices $A$ y $B$ de $3 \\times 3$, ingrese la **matriz respuesta completa** $S = A + B$.")
         st.latex(rf"A = {matrix_to_latex(A)}, \quad B = {matrix_to_latex(B)}")
         
         S = A + B
-        c1, c2 = st.columns(2)
-        with c1: r_s11 = st.number_input("Elemento S[1,1]:", value=0.0, step=1.0)
-        with c2: r_s33 = st.number_input("Elemento S[3,3]:", value=0.0, step=1.0)
+        user_S = np.zeros((3, 3))
+        st.write("### Ingrese los 9 elementos de la Matriz Suma $S$:")
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_S[i, j] = st.number_input(f"S[{i+1},{j+1}]", value=0.0, step=1.0, key=f"sum_{i}_{j}")
         
-        if st.button("Comprobar Suma"):
-            if int(r_s11) == S[0,0] and int(r_s33) == S[2,2]:
-                st.success(f"¡Correcto! 🎉 Matriz Suma S:\n {S}")
+        if st.button("Comprobar Matriz Suma Completa"):
+            if np.array_equal(user_S, S):
+                st.success(f"¡Excelente! 🎉 Toda la Matriz Suma es correcta:\n{S}")
             else:
-                st.error(f"Incorrecto. ❌ S[1,1] exacto = {S[0,0]}, S[3,3] exacto = {S[2,2]}")
+                st.error("Incorrecto. ❌ Verifique los elementos ingresados.")
+                st.latex(rf"S_{{\text{{exacta}}}} = {matrix_to_latex(S)}")
 
     # 4. Multiplicación de Matrices
-    elif tema_al == "Multiplicación de Matrices (≥ 7 elementos)":
+    elif tema_al == "Multiplicación de Matrices (Verificación Completa)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_m_a_mult" not in st.session_state:
             st.session_state.al_m_a_mult = np.random.randint(-4, 5, size=(3, 3))
             st.session_state.al_m_b_mult = np.random.randint(-4, 5, size=(3, 3))
@@ -163,19 +194,24 @@ if asignatura == "Álgebra Lineal":
         A = st.session_state.al_m_a_mult
         B = st.session_state.al_m_b_mult
         
-        st.info("💡 **Instrucción:** Dadas las matrices $A$ y $B$ de $3 \\times 3$, determine el producto $P = A \\times B$. Ingrese $P_{1,1}$ y $P_{2,3}$.")
+        st.info("💡 **Instrucción:** Dadas las matrices $A$ y $B$ de $3 \\times 3$, ingrese la **matriz producto completa** $P = A \\times B$.")
         st.latex(rf"A = {matrix_to_latex(A)}, \quad B = {matrix_to_latex(B)}")
         
         P = np.dot(A, B)
-        c1, c2 = st.columns(2)
-        with c1: r_p11 = st.number_input("Elemento P[1,1]:", value=0.0, step=1.0)
-        with c2: r_p23 = st.number_input("Elemento P[2,3]:", value=0.0, step=1.0)
+        user_P = np.zeros((3, 3))
+        st.write("### Ingrese los 9 elementos de la Matriz Producto $P$:")
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_P[i, j] = st.number_input(f"P[{i+1},{j+1}]", value=0.0, step=1.0, key=f"mult_{i}_{j}")
         
-        if st.button("Comprobar Multiplicación"):
-            if int(r_p11) == P[0,0] and int(r_p23) == P[1,2]:
-                st.success(f"¡Excelente! 🎉 Producto P:\n{P}")
+        if st.button("Comprobar Matriz Producto Completa"):
+            if np.array_equal(user_P, P):
+                st.success(f"¡Excelente! 🎉 Toda la Matriz Producto es correcta:\n{P}")
             else:
-                st.error(f"Incorrecto. ❌ P[1,1] = {P[0,0]}, P[2,3] = {P[1,2]}")
+                st.error("Incorrecto. ❌ Verifique los elementos ingresados.")
+                st.latex(rf"P_{{\text{{exacta}}}} = {matrix_to_latex(P)}")
 
     # 5. Determinantes 4x4
     elif tema_al == "Determinantes (Tamaño mínimo 4x4)":
@@ -197,7 +233,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Incorrecto. ❌ El determinante exacto es {det_exacto}")
 
     # 6. Matriz Inversa
-    elif tema_al == "Cálculo de la Matriz Inversa a través de la Adjunta (≥ 3x3)":
+    elif tema_al == "Cálculo de la Matriz Inversa (Verificación Completa 3x3)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_inv3" not in st.session_state:
             while True:
                 m = np.random.randint(-3, 4, size=(3, 3))
@@ -207,24 +243,28 @@ if asignatura == "Álgebra Lineal":
             st.rerun()
             
         A = st.session_state.al_inv3
-        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$, calcule su inversa mediante $A^{-1} = \\frac{1}{\\det(A)} \\text{Adj}(A)$. Ingrese $\\det(A)$ y el elemento $A^{-1}_{1,1}$.")
+        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$, calcule su matriz inversa $A^{-1}$ e ingrese los 9 elementos con 4 decimales.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
-        detA = int(round(np.linalg.det(A)))
         invA = np.linalg.inv(A)
+        user_inv = np.zeros((3, 3))
+        st.write("### Ingrese la Matriz Inversa $A^{-1}$ completa:")
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_inv[i, j] = st.number_input(f"A⁻¹[{i+1},{j+1}]", value=0.0000, format="%.4f", key=f"inv_{i}_{j}")
         
-        c1, c2 = st.columns(2)
-        with c1: r_det = st.number_input("Determinante det(A):", value=0.0, step=1.0)
-        with c2: r_inv11 = st.number_input("Elemento A^(-1)[1,1]:", value=0.0000, format="%.4f")
-        
-        if st.button("Comprobar Inversa"):
-            if int(r_det) == detA and abs(r_inv11 - invA[0,0]) < 0.05:
-                st.success(f"¡Correcto! 🎉 det(A) = {detA}.\n Matriz Inversa A^(-1):\n {invA.round(4)}")
+        if st.button("Comprobar Matriz Inversa Completa"):
+            if np.allclose(user_inv, invA, atol=0.05):
+                st.success("¡Excelente! 🎉 Toda la Matriz Inversa es correcta.")
+                st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
             else:
-                st.error(f"Incorrecto. ❌ det(A) = {detA}, A^(-1)[1,1] exacto = {invA[0,0]:.4f}")
+                st.error("Incorrecto. ❌ Matriz Inversa exacta:")
+                st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
 
     # 7. Gauss-Jordán 3x3
-    elif tema_al == "Método de Gauss-Jordán (Sistema 3x3)":
+    elif tema_al == "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_gj_a" not in st.session_state:
             while True:
                 a = np.random.randint(-4, 5, size=(3, 3))
@@ -236,20 +276,40 @@ if asignatura == "Álgebra Lineal":
             st.rerun()
             
         A, b = st.session_state.al_gj_a, st.session_state.al_gj_b
-        st.info("💡 **Instrucción:** Resuelva el sistema de ecuaciones lineales $3 \\times 3$ por Gauss-Jordán e ingrese $(x, y, z)$.")
+        st.info("💡 **Instrucción:** Resuelva el sistema por Gauss-Jordán. Ingrese la matriz resultante de la eliminación gaussiana (triangulada superior con el término independiente en la 4ta columna) y la solución final $(x, y, z)$.")
         st.latex(rf"\begin{{cases}} {A[0,0]}x + {A[0,1]}y + {A[0,2]}z = {b[0]} \\ {A[1,0]}x + {A[1,1]}y + {A[1,2]}z = {b[1]} \\ {A[2,0]}x + {A[2,1]}y + {A[2,2]}z = {b[2]} \end{{cases}}")
         
+        Aug = np.column_stack((A.astype(float), b.astype(float)))
+        for i in range(3):
+            for j in range(i+1, 3):
+                factor = Aug[j, i] / Aug[i, i]
+                Aug[j, i:] -= factor * Aug[i, i:]
+                
         sol = np.linalg.solve(A, b)
+        
+        st.write("### 1. Ingrese la Matriz Triangulada Superior Aumentada $[U | d]$:")
+        user_aug = np.zeros((3, 4))
+        for i in range(3):
+            cols = st.columns(4)
+            for j in range(4):
+                with cols[j]:
+                    user_aug[i, j] = st.number_input(f"U[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"gj_aug_{i}_{j}")
+                    
+        st.write("### 2. Ingrese las Respuestas del Sistema $(x, y, z)$:")
         c1, c2, c3 = st.columns(3)
-        with c1: rx = st.number_input("Valor de x:", value=0.00, format="%.2f")
-        with c2: ry = st.number_input("Valor de y:", value=0.00, format="%.2f")
-        with c3: rz = st.number_input("Valor de z:", value=0.00, format="%.2f")
+        with c1: rx = st.number_input("x:", value=0.00, format="%.2f", key="gj_rx")
+        with c2: ry = st.number_input("y:", value=0.00, format="%.2f", key="gj_ry")
+        with c3: rz = st.number_input("z:", value=0.00, format="%.2f", key="gj_rz")
         
         if st.button("Comprobar Gauss-Jordán"):
-            if abs(rx - sol[0]) < 0.1 and abs(ry - sol[1]) < 0.1 and abs(rz - sol[2]) < 0.1:
-                st.success(f"¡Excelente! 🎉 Solución: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
+            ok_mat = np.allclose(user_aug, Aug, atol=0.1)
+            ok_res = np.allclose([rx, ry, rz], sol, atol=0.1)
+            if ok_mat and ok_res:
+                st.success(f"¡Excelente! 🎉 Matriz triangulada y solución (x={sol[0]:.2f}, y={sol[1]:.2f}, z={sol[2]:.2f}) correctas.")
             else:
-                st.error(f"Incorrecto. ❌ Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
+                st.error("Incorrecto. ❌ Revisa la matriz triangulada o las respuestas:")
+                st.latex(rf"[U | d] = {matrix_to_latex(Aug)}")
+                st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
     # 8. Regla de Cramer 3x3
     elif tema_al == "Regla de Cramer (Sistema 3x3)":
@@ -280,58 +340,93 @@ if asignatura == "Álgebra Lineal":
             else:
                 st.error(f"Incorrecto. ❌ Valores exactos: Δ = {det_sys}, y = {sol[1]:.2f}")
 
-    # 9. Factorización LU por Crout
-    elif tema_al == "Factorización LU por Crout (Sistema 3x3)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "al_crout_a" not in st.session_state:
+    # 9. Factorización LU por Doolittle
+    elif tema_al == "Factorización LU por Doolittle (Sistema 3x3)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "al_doolittle_a" not in st.session_state:
             while True:
                 m = np.random.randint(1, 5, size=(3, 3))
+                b = np.random.randint(-10, 11, size=3)
                 if int(round(np.linalg.det(m))) != 0 and m[0,0] != 0:
-                    st.session_state.al_crout_a = m.astype(float)
+                    st.session_state.al_doolittle_a = m.astype(float)
+                    st.session_state.al_doolittle_b = b.astype(float)
                     break
             st.rerun()
             
-        A = st.session_state.al_crout_a
-        st.info("💡 **Instrucción:** En la Factorización LU de Crout ($A = L \\cdot U$), donde la diagonal de $U$ son unos ($U_{i,i} = 1$), verifique las matrices $L$ y $U$ e ingrese $L_{2,1}$ y $U_{1,2}$.")
-        st.latex(rf"A = {matrix_to_latex(A)}")
+        A = st.session_state.al_doolittle_a
+        b = st.session_state.al_doolittle_b
+        st.info("💡 **Instrucción:** En la Factorización LU por Doolittle ($A = L \\cdot U$), donde la diagonal de $L$ tiene unos ($L_{i,i} = 1$), ingrese las matrices $L$ y $U$ completas y la solución $(x, y, z)$.")
+        st.latex(rf"A = {matrix_to_latex(A)}, \quad b = {matrix_to_latex(b)}")
         
-        L = np.zeros((3, 3))
-        U = np.eye(3)
+        L = np.eye(3)
+        U = A.copy()
         for i in range(3):
-            for j in range(i, 3):
-                L[j, i] = A[j, i] - sum(L[j, k] * U[k, i] for k in range(i))
-            for j in range(i + 1, 3):
-                U[i, j] = (A[i, j] - sum(L[i, k] * U[k, j] for k in range(i))) / L[i, i]
+            for j in range(i+1, 3):
+                factor = U[j, i] / U[i, i]
+                L[j, i] = factor
+                U[j, i:] -= factor * U[i, i:]
                 
-        r_l21 = st.number_input("Elemento L[2,1] (L_21):", value=0.00, format="%.2f")
-        r_u12 = st.number_input("Elemento U[1,2] (U_12):", value=0.00, format="%.2f")
+        sol = np.linalg.solve(A, b)
         
-        if st.button("Verificar Crout LU"):
-            if abs(r_l21 - L[1,0]) < 0.1 and abs(r_u12 - U[0,1]) < 0.1:
-                st.success("¡Excelente! 🎉 Descomposición Crout Verificada.")
-                st.latex(rf"L = {matrix_to_latex(L)}, \quad U = {matrix_to_latex(U)}")
+        st.write("### 1. Ingrese la Matriz L (Doolittle):")
+        user_L = np.zeros((3, 3))
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_L[i, j] = st.number_input(f"L[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"dool_L_{i}_{j}")
+                    
+        st.write("### 2. Ingrese la Matriz U (Doolittle):")
+        user_U = np.zeros((3, 3))
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_U[i, j] = st.number_input(f"U[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"dool_U_{i}_{j}")
+                    
+        st.write("### 3. Ingrese las Respuestas del Sistema $(x, y, z)$:")
+        c1, c2, c3 = st.columns(3)
+        with c1: rx = st.number_input("x:", value=0.00, format="%.2f", key="dool_rx")
+        with c2: ry = st.number_input("y:", value=0.00, format="%.2f", key="dool_ry")
+        with c3: rz = st.number_input("z:", value=0.00, format="%.2f", key="dool_rz")
+        
+        if st.button("Verificar Doolittle LU y Respuestas"):
+            ok_L = np.allclose(user_L, L, atol=0.1)
+            ok_U = np.allclose(user_U, U, atol=0.1)
+            ok_sol = np.allclose([rx, ry, rz], sol, atol=0.1)
+            if ok_L and ok_U and ok_sol:
+                st.success("¡Excelente! 🎉 Descomposición Doolittle L, U y respuestas totalmente correctas.")
             else:
-                st.error(f"Incorrecto. ❌ Valores exactos: L_21 = {L[1,0]:.2f}, U_12 = {U[0,1]:.2f}")
+                st.error("Incorrecto. ❌ Matrices exactas y solución:")
                 st.latex(rf"L = {matrix_to_latex(L)}, \quad U = {matrix_to_latex(U)}")
+                st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
-    # 10. Gauss-Seidel 3x3
-    elif tema_al == "Método Gauss-Seidel (Sistema 3x3)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "al_gs_a" not in st.session_state:
-            st.session_state.al_gs_a = np.array([[12, -2, 1], [-1, 10, -2], [2, -1, 11]], dtype=float)
-            st.session_state.al_gs_b = np.random.randint(-15, 16, size=3).astype(float)
+    # 10. Gauss-Seidel
+    elif tema_al == "Método Gauss-Seidel (Verificación 3ra Iteración)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "al_gs3_a" not in st.session_state:
+            st.session_state.al_gs3_a = np.array([[12, -2, 1], [-1, 10, -2], [2, -1, 11]], dtype=float)
+            st.session_state.al_gs3_b = np.random.randint(-15, 16, size=3).astype(float)
             st.rerun()
             
-        A, b = st.session_state.al_gs_a, st.session_state.al_gs_b
-        st.info("💡 **Instrucción:** Verifique la condición de diagonal dominante. Partiendo de $(x^{(0)}, y^{(0)}, z^{(0)}) = (0,0,0)$, calcule $x^{(1)}$ en la primera iteración.")
+        A, b = st.session_state.al_gs3_a, st.session_state.al_gs3_b
+        st.info("💡 **Instrucción:** Partiendo de $(x^{(0)}, y^{(0)}, z^{(0)}) = (0,0,0)$, realice **3 iteraciones** del Método de Gauss-Seidel e ingrese los valores de $(x^{(3)}, y^{(3)}, z^{(3)})$.")
         st.latex(rf"\begin{{cases}} {int(A[0,0])}x {int(A[0,1]):+}y {int(A[0,2]):+}z = {int(b[0])} \\ {int(A[1,0])}x {int(A[1,1]):+}y {int(A[1,2]):+}z = {int(b[1])} \\ {int(A[2,0])}x {int(A[2,1]):+}y {int(A[2,2]):+}z = {int(b[2])} \end{{cases}}")
         
-        x1 = (b[0] - A[0,1]*0 - A[0,2]*0) / A[0,0]
-        r_x1 = st.number_input("Valor de x^(1):", value=0.0000, format="%.4f")
+        x_k, y_k, z_k = 0.0, 0.0, 0.0
+        for _ in range(3):
+            x_k = (b[0] - A[0,1]*y_k - A[0,2]*z_k) / A[0,0]
+            y_k = (b[1] - A[1,0]*x_k - A[1,2]*z_k) / A[1,1]
+            z_k = (b[2] - A[2,0]*x_k - A[2,1]*y_k) / A[2,2]
+            
+        c1, c2, c3 = st.columns(3)
+        with c1: rx3 = st.number_input("Valor de x^(3):", value=0.0000, format="%.4f")
+        with c2: ry3 = st.number_input("Valor de y^(3):", value=0.0000, format="%.4f")
+        with c3: rz3 = st.number_input("Valor de z^(3):", value=0.0000, format="%.4f")
         
-        if st.button("Comprobar Gauss-Seidel"):
-            if abs(r_x1 - x1) < 0.01:
-                st.success(f"¡Excelente! 🎉 El sistema es convergente. x^(1) = {x1:.4f}")
+        if st.button("Comprobar 3ra Iteración de Gauss-Seidel"):
+            if abs(rx3 - x_k) < 0.01 and abs(ry3 - y_k) < 0.01 and abs(rz3 - z_k) < 0.01:
+                st.success(f"¡Excelente! 🎉 Valores correctos en la 3ra iteración: x^(3) = {x_k:.4f}, y^(3) = {y_k:.4f}, z^(3) = {z_k:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ El valor exacto de x^(1) es {x1:.4f}")
+                st.error(f"Incorrecto. ❌ Valores exactos en la 3ra iteración: x^(3) = {x_k:.4f}, y^(3) = {y_k:.4f}, z^(3) = {z_k:.4f}")
 
     # 11. Independencia Lineal
     elif tema_al == "Independencia Lineal (Subespacios)":
@@ -358,93 +453,124 @@ if asignatura == "Álgebra Lineal":
     # 12. Polinomio Característico
     else:
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_pc_mat" not in st.session_state:
-            m = np.random.randint(-2, 3, size=(3, 3))
-            st.session_state.al_pc_mat = (m + m.T).astype(float)
+            st.session_state.al_pc_mat = generar_matriz_con_dos_ceros_fuera_diag()
             st.rerun()
             
         A = st.session_state.al_pc_mat
-        st.info("💡 **Instrucción:** Para la matriz simétrica $A$ de $3 \\times 3$, encuentre su polinomio característico $\\det(A - \\lambda I) = 0$ e ingrese el valor propio dominante $\\lambda_{\\text{max}}$.")
+        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$ (que posee exactamente 2 ceros fuera de la diagonal), halle su polinomio característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ y determine la traza $\\text{tr}(A) = c_2$ y el determinante $\\det(A) = c_0$.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
+        c2 = float(np.trace(A))
+        c0 = float(np.linalg.det(A))
         vals = np.linalg.eigvals(A)
-        max_eig = max(vals, key=abs)
         
-        r_eig = st.number_input("Eigenvalor dominante (λ_max):", value=0.00, format="%.2f")
+        c1_col, c2_col = st.columns(2)
+        with c1_col: r_c2 = st.number_input("Coeficiente c2 (Traza = sum(λ)):", value=0.0, step=1.0)
+        with c2_col: r_c0 = st.number_input("Término c0 (Determinante det(A)):", value=0.0, step=1.0)
         
-        if st.button("Comprobar Polinomio Característico"):
-            if abs(r_eig - max_eig) < 0.15:
-                st.success(f"¡Correcto! 🎉 Eigenvalores: {[round(x,2) for x in vals]}. Dominante = {max_eig:.2f}")
+        if st.button("Verificar Polinomio Característico"):
+            if abs(r_c2 - c2) < 0.1 and abs(r_c0 - c0) < 0.1:
+                st.success(f"¡Verificación Correcta! 🎉 c2 (Traza) = {c2:.1f}, c0 (det) = {c0:.1f}.\n Eigenvalores: {[round(x,2) for x in vals]}")
             else:
-                st.error(f"Incorrecto. ❌ Eigenvalores exactos: {[round(x,2) for x in vals]}. Dominante = {max_eig:.2f}")
+                st.error(f"Incorrecto. ❌ Valores exactos: c2 (Traza) = {c2:.1f}, c0 (det(A)) = {c0:.1f}")
 
 # ==========================================
 # MÉTODOS NUMÉRICOS
 # ==========================================
 else:
-    st.sidebar.markdown("---")
-    tema_mn = st.sidebar.selectbox("Seleccione Tema de Métodos Numéricos:", [
-        "Series Numéricas (Seno / Coseno - 5ta iteración)",
-        "Serie de Taylor (Polinomio de 3er Grado)",
+    temas_mn_lista = [
+        "Series Numéricas (Seno / Coseno con Ángulos 10° a 359°)",
+        "Serie de Taylor (LN / Series Geométricas Alternadas)",
         "Concepto de Errores y Sus Tipos",
         "Cambio de Registro de Computadora de 32 bits a Decimal",
-        "Método de Bisección (Polinómica y Trigonométrica)",
-        "Método de Falsa Posición y Falsa Posición Modificada",
-        "Método de Newton (Polinómica y Trigonométrica)",
-        "Método de la Secante (Polinómica y Trigonométrica)",
-        "Método de Gauss-Jordán (Sistema 3x3)",
-        "Método de Descomposición A-LU (Matriz U y Respuestas)",
-        "Inversión de Matriz (Tamaño 3x3)",
-        "Método del Polinomio Característico (≥ 3x3)",
+        "Método de Bisección (Ecuaciones Polinómicas y Trigonométricas a la vez)",
+        "Método de Falsa Posición (Ecuaciones Polinómicas y Trigonométricas a la vez)",
+        "Método de Falsa Posición Modificada (Ecuaciones Polinómicas y Trigonométricas a la vez)",
+        "Método de Newton (Ecuaciones Polinómicas y Trigonométricas a la vez)",
+        "Método de la Secante (Ecuaciones Polinómicas y Trigonométricas a la vez)",
+        "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)",
+        "Método de Descomposición LU por Doolittle / Crout",
+        "Inversión de Matriz (Verificación Completa 3x3)",
+        "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)",
         "Método de Iteración Matricial (Tamaño 5x5)",
         "Regresión Lineal (5 datos)",
         "Regresión Cuadrática (5 datos)",
         "Regresión Exponencial (5 datos)",
-        "Interpolación por Lagrange (4 datos)",
-        "Interpolación por Polinomio Único (5 datos)",
+        "Interpolación Polinómica Única (5 datos - 4 Coeficientes)",
         "Sistema No Lineal por Newton-Raphson (Verificación 3ra Iteración)",
-        "Aproximación de Integrales (Simpson Compuesto)",
+        "Aproximación de Integrales (Simpson Compuesto - Raíz Cuadrada / Cúbica)",
         "EDO - Método de Euler Modificado",
         "EDO - Método de Taylor",
         "EDO - Runge-Kutta Orden 4"
-    ])
+    ]
     
+    if "tema_mn" not in st.session_state:
+        st.session_state.tema_mn = temas_mn_lista[0]
+        
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎯 Seleccione un Tema (Botones):")
+    for t in temas_mn_lista:
+        btn_label = f"👉 {t}" if st.session_state.tema_mn == t else t
+        if st.sidebar.button(btn_label, key=f"btn_mn_{t}", use_container_width=True):
+            st.session_state.tema_mn = t
+            st.rerun()
+            
+    tema_mn = st.session_state.tema_mn
     st.markdown(f"## 🔢 Métodos Numéricos — {tema_mn}")
     
-    # 1. Series numéricas (5ta iteración)
-    if tema_mn == "Series Numéricas (Seno / Coseno - 5ta iteración)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_s5_x" not in st.session_state:
-            st.session_state.mn_s5_x = round(float(np.random.uniform(0.3, 1.2)), 2)
+    # 1. Series numéricas
+    if tema_mn == "Series Numéricas (Seno / Coseno con Ángulos 10° a 359°)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_s5_deg" not in st.session_state:
+            st.session_state.mn_s5_deg = int(np.random.randint(10, 360))
+            st.session_state.mn_s5_tipo = str(np.random.choice(["seno", "coseno"]))
             st.rerun()
-        x_val = st.session_state.mn_s5_x
-        st.info(f"💡 **Instrucción:** Evalúe los primeros 5 términos (5ta iteración) de la serie de Maclaurin para $\\sin({x_val})$.")
-        st.latex(rf"\sin(x) \approx x - \frac{{x^3}}{{3!}} + \frac{{x^5}}{{5!}} - \frac{{x^7}}{{7!}} + \frac{{x^9}}{{9!}}")
+            
+        deg = st.session_state.mn_s5_deg
+        tipo = st.session_state.mn_s5_tipo
+        rad = math.radians(deg)
         
-        s5 = x_val - (x_val**3)/6.0 + (x_val**5)/120.0 - (x_val**7)/5040.0 + (x_val**9)/362880.0
-        r_s5 = st.number_input("Valor de la serie en la 5ta iteración:", value=0.0000, format="%.6f")
+        st.info(f"💡 **Instrucción:** Dado el ángulo $\\theta = {deg}^\\circ$ (${rad:.4f}$ rad), evalúe los primeros 5 términos (5ta iteración de Maclaurin) de la función **{tipo.upper()}**.")
+        
+        if tipo == "seno":
+            st.latex(rf"\sin(x) \approx x - \frac{{x^3}}{{3!}} + \frac{{x^5}}{{5!}} - \frac{{x^7}}{{7!}} + \frac{{x^9}}{{9!}}")
+            s5 = rad - (rad**3)/6.0 + (rad**5)/120.0 - (rad**7)/5040.0 + (rad**9)/362880.0
+        else:
+            st.latex(rf"\cos(x) \approx 1 - \frac{{x^2}}{{2!}} + \frac{{x^4}}{{4!}} - \frac{{x^6}}{{6!}} + \frac{{x^8}}{{8!}}")
+            s5 = 1 - (rad**2)/2.0 + (rad**4)/24.0 - (rad**6)/720.0 + (rad**8)/40320.0
+            
+        r_s5 = st.number_input(f"Valor aproximado en la 5ta iteración para {tipo}({deg}°):", value=0.0000, format="%.6f")
         
         if st.button("Comprobar Serie (5ta Iteración)"):
-            if abs(r_s5 - s5) < 0.0001:
-                st.success(f"¡Correcto! 🎉 Valor aproximado en la 5ta iteración = {s5:.6f}")
+            if abs(r_s5 - s5) < 0.0005:
+                st.success(f"¡Correcto! 🎉 Valor en la 5ta iteración = {s5:.6f}")
             else:
                 st.error(f"Incorrecto. ❌ El valor exacto en la 5ta iteración es {s5:.6f}")
 
-    # 2. Serie de Taylor (3er Grado)
-    elif tema_mn == "Serie de Taylor (Polinomio de 3er Grado)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_tay3_a" not in st.session_state:
-            st.session_state.mn_tay3_a = round(float(np.random.uniform(0.5, 2.0)), 2)
+    # 2. Serie de Taylor
+    elif tema_mn == "Serie de Taylor (LN / Series Geométricas Alternadas)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_tay_func" not in st.session_state:
+            st.session_state.mn_tay_func = str(np.random.choice(["ln", "geometrica"]))
+            st.session_state.mn_tay_x = round(float(np.random.uniform(0.1, 0.5)), 2)
             st.rerun()
-        a_val = st.session_state.mn_tay3_a
-        st.info(f"💡 **Instrucción:** Para $f(x) = e^x$ alrededor de $x = 0$, evalúe $P_3({a_val})$ usando el polinomio de 3er grado.")
-        st.latex(rf"P_3(x) = 1 + x + \frac{{x^2}}{{2!}} + \frac{{x^3}}{{3!}}")
+            
+        func_tipo = st.session_state.mn_tay_func
+        x_val = st.session_state.mn_tay_x
         
-        p3 = 1 + a_val + (a_val**2)/2.0 + (a_val**3)/6.0
-        r_p3 = st.number_input(f"Valor de P3({a_val}):", value=0.0000, format="%.4f")
-        
-        if st.button("Comprobar Polinomio de Taylor"):
-            if abs(r_p3 - p3) < 0.001:
-                st.success(f"¡Correcto! 🎉 P3({a_val}) = {p3:.4f}")
+        if func_tipo == "ln":
+            st.info(f"💡 **Instrucción (Logaritmo Natural):** Evalúe el polinomio de Taylor de 4to grado para $f(x) = \\ln(1+x)$ en $x = {x_val}$.")
+            st.latex(rf"P_4(x) = x - \frac{{x^2}}{{2}} + \frac{{x^3}}{{3}} - \frac{{x^4}}{{4}}")
+            p4 = x_val - (x_val**2)/2.0 + (x_val**3)/3.0 - (x_val**4)/4.0
+        else:
+            st.info(f"💡 **Instrucción (Serie Geométrica):** Evalúe la serie geométrica de 4to grado para $f(x) = \\frac{{1}}{{1-x}}$ en $x = {x_val}$.")
+            st.latex(rf"P_4(x) = 1 + x + x^2 + x^3 + x^4")
+            p4 = 1 + x_val + x_val**2 + x_val**3 + x_val**4
+            
+        r_p4 = st.number_input(f"Valor aproximado P4({x_val}):", value=0.0000, format="%.4f")
+        if st.button("Comprobar Serie de Taylor"):
+            if abs(r_p4 - p4) < 0.001:
+                st.success(f"¡Correcto! 🎉 P4({x_val}) = {p4:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ El valor exacto es {p3:.4f}")
+                st.error(f"Incorrecto. ❌ El valor exacto es {p4:.4f}")
 
     # 3. Errores
     elif tema_mn == "Concepto de Errores y Sus Tipos":
@@ -489,114 +615,185 @@ else:
                 st.error(f"Incorrecto. ❌ Signo = {signo}, Exponente Sesgado E = {exp_bias}")
 
     # 5. Bisección
-    elif tema_mn == "Método de Bisección (Polinómica y Trigonométrica)":
-        tipo_eq = st.selectbox("📌 Seleccione Tipo de Ecuación:", ["Polinómica", "Trigonométrica"])
+    elif tema_mn == "Método de Bisección (Ecuaciones Polinómicas y Trigonométricas a la vez)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_bis_k" not in st.session_state:
-            st.session_state.mn_bis_k = int(np.random.randint(2, 7))
+            st.session_state.mn_bis_k = int(np.random.randint(1, 5))
             st.rerun()
         k = st.session_state.mn_bis_k
+        st.info(f"💡 **Instrucción (Ecuación Mixta Polinómica-Trigonométrica):** Para $f(x) = x^3 - \\cos(x) - {k} = 0$ en $[0, 2]$, calcule las **3 primeras aproximaciones del punto medio** ($x_{{r1}}, x_{{r2}}, x_{{r3}}$) con 4 decimales.")
+        st.latex(rf"f(x) = x^3 - \cos(x) - {k} = 0")
         
-        if tipo_eq == "Polinómica":
-            st.info(f"💡 **Instrucción (Polinómica):** Halle el punto medio $x_r$ en la 1ra iteración en $[1, 2]$.")
-            st.latex(rf"f(x) = x^3 - {k}x - 1 = 0")
-            xl, xu = 1.0, 2.0
-            xr = (xl + xu) / 2.0
-        else:
-            st.info(f"💡 **Instrucción (Trigonométrica):** Halle el punto medio $x_r$ en la 1ra iteración en $[0, 1.5]$.")
-            st.latex(rf"f(x) = \cos(x) - {k/10.0:.1f}x = 0")
-            xl, xu = 0.0, 1.5
-            xr = (xl + xu) / 2.0
+        def f_bis(x):
+            return x**3 - math.cos(x) - k
             
-        r_xr = st.number_input("Punto medio xr:", value=0.0000, format="%.4f")
-        if st.button("Comprobar Bisección"):
-            if abs(r_xr - xr) < 0.01:
-                st.success(f"¡Correcto! 🎉 xr = {xr:.4f}")
+        xl, xu = 0.0, 2.0
+        xr_vals = []
+        for _ in range(3):
+            xr = (xl + xu) / 2.0
+            xr_vals.append(xr)
+            fl = f_bis(xl)
+            fr = f_bis(xr)
+            if fl * fr < 0:
+                xu = xr
             else:
-                st.error(f"Incorrecto. ❌ xr exacto = {xr:.4f}")
+                xl = xr
+                
+        c1, c2, c3 = st.columns(3)
+        with c1: rx1 = st.number_input("xr1 (1ra Iteración):", value=0.0000, format="%.4f")
+        with c2: rx2 = st.number_input("xr2 (2da Iteración):", value=0.0000, format="%.4f")
+        with c3: rx3 = st.number_input("xr3 (3ra Iteración):", value=0.0000, format="%.4f")
+        
+        if st.button("Comprobar 3 Aproximaciones de Bisección"):
+            if abs(rx1 - xr_vals[0]) < 0.001 and abs(rx2 - xr_vals[1]) < 0.001 and abs(rx3 - xr_vals[2]) < 0.001:
+                st.success(f"¡Correcto! 🎉 xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
+            else:
+                st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
 
     # 6. Falsa Posición
-    elif tema_mn == "Método de Falsa Posición y Falsa Posición Modificada":
-        tipo_eq = st.selectbox("📌 Seleccione Tipo de Ecuación:", ["Polinómica", "Trigonométrica"])
+    elif tema_mn == "Método de Falsa Posición (Ecuaciones Polinómicas y Trigonométricas a la vez)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_fp_k" not in st.session_state:
-            st.session_state.mn_fp_k = int(np.random.randint(2, 6))
+            st.session_state.mn_fp_k = int(np.random.randint(1, 5))
             st.rerun()
         k = st.session_state.mn_fp_k
+        st.info(f"💡 **Instrucción (Ecuación Mixta Polinómica-Trigonométrica):** Para $f(x) = x^3 - \\sin(x) - {k} = 0$ en $[1, 2]$, calcule las **3 primeras aproximaciones** ($x_{{r1}}, x_{{r2}}, x_{{r3}}$) por Falsa Posición.")
+        st.latex(rf"f(x) = x^3 - \sin(x) - {k} = 0")
         
-        if tipo_eq == "Polinómica":
-            st.info(f"💡 **Instrucción (Polinómica):** Halle $x_r$ en la 1ra iteración por Falsa Posición en $[1, 2]$.")
-            st.latex(rf"f(x) = x^3 - {k} = 0")
-            xl, xu = 1.0, 2.0
-            fl, fu = xl**3 - k, xu**3 - k
-        else:
-            st.info(f"💡 **Instrucción (Trigonométrica):** Halle $x_r$ en la 1ra iteración por Falsa Posición en $[1, 2]$.")
-            st.latex(rf"f(x) = \sin(x) - {k/10.0:.1f}x = 0")
-            xl, xu = 1.0, 2.0
-            fl, fu = math.sin(xl) - (k/10.0)*xl, math.sin(xu) - (k/10.0)*xu
+        def f_fp(x):
+            return x**3 - math.sin(x) - k
             
-        xr = xu - (fu * (xl - xu)) / (fl - fu)
-        r_xr = st.number_input("Valor de xr:", value=0.0000, format="%.4f")
-        if st.button("Comprobar Falsa Posición"):
-            if abs(r_xr - xr) < 0.02:
-                st.success(f"¡Excelente! 🎉 xr = {xr:.4f}")
+        xl, xu = 1.0, 2.0
+        xr_vals = []
+        for _ in range(3):
+            fl = f_fp(xl)
+            fu = f_fp(xu)
+            xr = xu - (fu * (xl - xu)) / (fl - fu)
+            xr_vals.append(xr)
+            fr = f_fp(xr)
+            if fl * fr < 0:
+                xu = xr
             else:
-                st.error(f"Incorrecto. ❌ El valor exacto es xr = {xr:.4f}")
+                xl = xr
+                
+        c1, c2, c3 = st.columns(3)
+        with c1: rx1 = st.number_input("xr1 (1ra Iteración):", value=0.0000, format="%.4f", key="fp1")
+        with c2: rx2 = st.number_input("xr2 (2da Iteración):", value=0.0000, format="%.4f", key="fp2")
+        with c3: rx3 = st.number_input("xr3 (3ra Iteración):", value=0.0000, format="%.4f", key="fp3")
+        
+        if st.button("Comprobar 3 Aproximaciones de Falsa Posición"):
+            if abs(rx1 - xr_vals[0]) < 0.002 and abs(rx2 - xr_vals[1]) < 0.002 and abs(rx3 - xr_vals[2]) < 0.002:
+                st.success(f"¡Excelente! 🎉 xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
+            else:
+                st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
 
-    # 7. Newton
-    elif tema_mn == "Método de Newton (Polinómica y Trigonométrica)":
-        tipo_eq = st.selectbox("📌 Seleccione Tipo de Ecuación:", ["Polinómica", "Trigonométrica"])
+    # 7. Falsa Posición Modificada
+    elif tema_mn == "Método de Falsa Posición Modificada (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_fpm_k" not in st.session_state:
+            st.session_state.mn_fpm_k = int(np.random.randint(1, 5))
+            st.rerun()
+        k = st.session_state.mn_fpm_k
+        st.info(f"💡 **Instrucción (Ecuación Mixta Polinómica-Trigonométrica):** Para $f(x) = x^3 - \\cos(x) - {k} = 0$ en $[0, 2]$, aplique Falsa Posición Modificada y verifique $x_{{r1}}, x_{{r2}}, x_{{r3}}$.")
+        st.latex(rf"f(x) = x^3 - \cos(x) - {k} = 0")
+        
+        def f_fpm(x):
+            return x**3 - math.cos(x) - k
+            
+        xl, xu = 0.0, 2.0
+        fl = f_fpm(xl)
+        fu = f_fpm(xu)
+        xr_vals = []
+        l_count, u_count = 0, 0
+        for _ in range(3):
+            xr = xu - (fu * (xl - xu)) / (fl - fu)
+            xr_vals.append(xr)
+            fr = f_fpm(xr)
+            if fl * fr < 0:
+                xu = xr
+                fu = fr
+                u_count = 0
+                l_count += 1
+                if l_count >= 2: fl /= 2.0
+            else:
+                xl = xr
+                fl = fr
+                l_count = 0
+                u_count += 1
+                if u_count >= 2: fu /= 2.0
+                
+        c1, c2, c3 = st.columns(3)
+        with c1: rx1 = st.number_input("xr1 (1ra Iteración):", value=0.0000, format="%.4f", key="fpm1")
+        with c2: rx2 = st.number_input("xr2 (2da Iteración):", value=0.0000, format="%.4f", key="fpm2")
+        with c3: rx3 = st.number_input("xr3 (3ra Iteración):", value=0.0000, format="%.4f", key="fpm3")
+        
+        if st.button("Comprobar 3 Aproximaciones (Falsa Posición Modificada)"):
+            if abs(rx1 - xr_vals[0]) < 0.002 and abs(rx2 - xr_vals[1]) < 0.002 and abs(rx3 - xr_vals[2]) < 0.002:
+                st.success(f"¡Excelente! 🎉 xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
+            else:
+                st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
+
+    # 8. Newton
+    elif tema_mn == "Método de Newton (Ecuaciones Polinómicas y Trigonométricas a la vez)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_nw_k" not in st.session_state:
-            st.session_state.mn_nw_k = round(float(np.random.uniform(1.2, 2.2)), 2)
+            st.session_state.mn_nw_k = int(np.random.randint(1, 5))
+            st.session_state.mn_nw_x0 = round(float(np.random.uniform(1.2, 2.0)), 2)
             st.rerun()
-        x0 = st.session_state.mn_nw_k
+        k = st.session_state.mn_nw_k
+        x0 = st.session_state.mn_nw_x0
+        st.info(f"💡 **Instrucción (Ecuación Mixta Polinómica-Trigonométrica):** Para $f(x) = x^3 - \\sin(x) - {k} = 0$ partiendo de $x_0 = {x0}$, calcule las **3 primeras iteraciones** de Newton-Raphson ($x_1, x_2, x_3$).")
+        st.latex(rf"f(x) = x^3 - \sin(x) - {k} = 0, \quad f'(x) = 3x^2 - \cos(x)")
         
-        if tipo_eq == "Polinómica":
-            st.info(f"💡 **Instrucción (Polinómica):** Para $x_0 = {x0}$, halle $x_1$ mediante Newton-Raphson.")
-            st.latex(rf"f(x) = x^3 - 2x - 5 = 0")
-            f0 = x0**3 - 2*x0 - 5
-            df0 = 3*(x0**2) - 2
-        else:
-            st.info(f"💡 **Instrucción (Trigonométrica):** Para $x_0 = {x0}$, halle $x_1$ mediante Newton-Raphson.")
-            st.latex(rf"f(x) = \sin(x) - \frac{{x}}{{2}} = 0")
-            f0 = math.sin(x0) - x0/2.0
-            df0 = math.cos(x0) - 0.5
+        x_k = x0
+        x_vals = []
+        for _ in range(3):
+            f_k = x_k**3 - math.sin(x_k) - k
+            df_k = 3*(x_k**2) - math.cos(x_k)
+            x_k = x_k - f_k / df_k
+            x_vals.append(x_k)
             
-        x1 = x0 - f0/df0
-        r_x1 = st.number_input("Valor de x_1:", value=0.0000, format="%.4f")
-        if st.button("Comprobar Newton"):
-            if abs(r_x1 - x1) < 0.02:
-                st.success(f"¡Correcto! 🎉 x_1 = {x1:.4f}")
+        c1, c2, c3 = st.columns(3)
+        with c1: rx1 = st.number_input("x1 (1ra Iteración):", value=0.0000, format="%.4f", key="nw1")
+        with c2: rx2 = st.number_input("x2 (2da Iteración):", value=0.0000, format="%.4f", key="nw2")
+        with c3: rx3 = st.number_input("x3 (3ra Iteración):", value=0.0000, format="%.4f", key="nw3")
+        
+        if st.button("Comprobar 3 Aproximaciones de Newton"):
+            if abs(rx1 - x_vals[0]) < 0.002 and abs(rx2 - x_vals[1]) < 0.002 and abs(rx3 - x_vals[2]) < 0.002:
+                st.success(f"¡Correcto! 🎉 x1={x_vals[0]:.4f}, x2={x_vals[1]:.4f}, x3={x_vals[2]:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ El valor exacto es x_1 = {x1:.4f}")
+                st.error(f"Incorrecto. ❌ Valores exactos: x1={x_vals[0]:.4f}, x2={x_vals[1]:.4f}, x3={x_vals[2]:.4f}")
 
-    # 8. Secante
-    elif tema_mn == "Método de la Secante (Polinómica y Trigonométrica)":
-        tipo_eq = st.selectbox("📌 Seleccione Tipo de Ecuación:", ["Polinómica", "Trigonométrica"])
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_sec_k" not in st.session_state:
-            st.session_state.mn_sec_k = int(np.random.randint(3, 8))
+    # 9. Secante
+    elif tema_mn == "Método de la Secante (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_sec_c" not in st.session_state:
+            st.session_state.mn_sec_c = int(np.random.randint(1, 5))
             st.rerun()
-        c = st.session_state.mn_sec_k
+        c = st.session_state.mn_sec_c
+        st.info(f"💡 **Instrucción (Ecuación Mixta Polinómica-Trigonométrica):** Para $f(x) = x^3 - \\cos(x) - {c} = 0$ con puntos iniciales $x_0 = 0.5$ y $x_1 = 1.5$, calcule las **3 primeras iteraciones** ($x_2, x_3, x_4$).")
+        st.latex(rf"f(x) = x^3 - \cos(x) - {c} = 0")
         
-        if tipo_eq == "Polinómica":
-            st.info(f"💡 **Instrucción (Polinómica):** Para $x_0 = 1$ y $x_1 = 2$, calcule $x_2$.")
-            st.latex(rf"f(x) = x^3 - {c} = 0")
-            x0, x1 = 1.0, 2.0
-            f0, f1 = x0**3 - c, x1**3 - c
-        else:
-            st.info(f"💡 **Instrucción (Trigonométrica):** Para $x_0 = 0.5$ y $x_1 = 1.0$, calcule $x_2$.")
-            st.latex(rf"f(x) = \cos(x) - x = 0")
-            x0, x1 = 0.5, 1.0
-            f0, f1 = math.cos(x0) - x0, math.cos(x1) - x1
+        def f_sec(x):
+            return x**3 - math.cos(x) - c
             
-        x2 = x1 - (f1 * (x0 - x1)) / (f0 - f1)
-        r_x2 = st.number_input("Valor de x_2:", value=0.0000, format="%.4f")
-        if st.button("Comprobar Secante"):
-            if abs(r_x2 - x2) < 0.02:
-                st.success(f"¡Correcto! 🎉 x_2 = {x2:.4f}")
+        x0, x1 = 0.5, 1.5
+        x_vals = []
+        for _ in range(3):
+            f0 = f_sec(x0)
+            f1 = f_sec(x1)
+            x2 = x1 - (f1 * (x0 - x1)) / (f0 - f1)
+            x_vals.append(x2)
+            x0, x1 = x1, x2
+            
+        c1, c2, c3 = st.columns(3)
+        with c1: rx2 = st.number_input("x2 (1ra Iteración):", value=0.0000, format="%.4f", key="sec1")
+        with c2: rx3 = st.number_input("x3 (2da Iteración):", value=0.0000, format="%.4f", key="sec2")
+        with c3: rx4 = st.number_input("x4 (3ra Iteración):", value=0.0000, format="%.4f", key="sec3")
+        
+        if st.button("Comprobar 3 Aproximaciones de la Secante"):
+            if abs(rx2 - x_vals[0]) < 0.002 and abs(rx3 - x_vals[1]) < 0.002 and abs(rx4 - x_vals[2]) < 0.002:
+                st.success(f"¡Correcto! 🎉 x2={x_vals[0]:.4f}, x3={x_vals[1]:.4f}, x4={x_vals[2]:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ El valor exacto es x_2 = {x2:.4f}")
+                st.error(f"Incorrecto. ❌ Valores exactos: x2={x_vals[0]:.4f}, x3={x_vals[1]:.4f}, x4={x_vals[2]:.4f}")
 
-    # 9. Gauss-Jordán 3x3
-    elif tema_mn == "Método de Gauss-Jordán (Sistema 3x3)":
+    # 10. Gauss-Jordán 3x3 (MN)
+    elif tema_mn == "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_gj_a" not in st.session_state:
             while True:
                 a = np.random.randint(-4, 5, size=(3, 3))
@@ -608,52 +805,112 @@ else:
             st.rerun()
             
         A, b = st.session_state.mn_gj_a, st.session_state.mn_gj_b
-        st.info("💡 **Instrucción:** Resuelva el sistema por Gauss-Jordán y determine $z$.")
+        st.info("💡 **Instrucción:** Resuelva el sistema por eliminación gaussiana e ingrese la matriz triangulada superior aumentada $[U | d]$ y las soluciones $(x, y, z)$.")
         st.latex(rf"\begin{{cases}} {A[0,0]}x + {A[0,1]}y + {A[0,2]}z = {b[0]} \\ {A[1,0]}x + {A[1,1]}y + {A[1,2]}z = {b[1]} \\ {A[2,0]}x + {A[2,1]}y + {A[2,2]}z = {b[2]} \end{{cases}}")
         
-        sol = np.linalg.solve(A, b)
-        r_z = st.number_input("Valor de z:", value=0.00, format="%.2f")
-        if st.button("Comprobar z"):
-            if abs(r_z - sol[2]) < 0.1:
-                st.success(f"¡Excelente! 🎉 z = {sol[2]:.2f}")
-            else:
-                st.error(f"Incorrecto. ❌ z exacto = {sol[2]:.2f}")
-
-    # 10. Descomposición LU (MN)
-    elif tema_mn == "Método de Descomposición A-LU (Matriz U y Respuestas)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_lu_a" not in st.session_state:
-            st.session_state.mn_lu_a = np.array([[2, 1, -1], [4, 4, 1], [-2, 3, 1]], dtype=float)
-            st.session_state.mn_lu_b = np.array([1, 11, 4], dtype=float)
-            st.rerun()
-            
-        A, b = st.session_state.mn_lu_a, st.session_state.mn_lu_b
-        st.info("💡 **Instrucción:** Halle la descomposición Doolittle $A = L \\cdot U$ y determine la matriz superior $U$ y la solución $X$.")
-        st.latex(rf"A = {matrix_to_latex(A)}, \quad B = {matrix_to_latex(b)}")
-        
-        L = np.eye(3)
-        U = A.copy()
+        Aug = np.column_stack((A.astype(float), b.astype(float)))
         for i in range(3):
             for j in range(i+1, 3):
-                factor = U[j, i] / U[i, i]
-                L[j, i] = factor
-                U[j, i:] -= factor * U[i, i:]
+                factor = Aug[j, i] / Aug[i, i]
+                Aug[j, i:] -= factor * Aug[i, i:]
                 
         sol = np.linalg.solve(A, b)
         
-        c1, c2 = st.columns(2)
-        with c1: r_u11 = st.number_input("Pivote U[2,2] (U_22):", value=0.00, format="%.2f")
-        with c2: r_x0 = st.number_input("Solución x_1:", value=0.00, format="%.2f")
+        st.write("### 1. Ingrese la Matriz Triangulada Superior Aumentada $[U | d]$:")
+        user_aug = np.zeros((3, 4))
+        for i in range(3):
+            cols = st.columns(4)
+            for j in range(4):
+                with cols[j]:
+                    user_aug[i, j] = st.number_input(f"U[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"mn_gj_aug_{i}_{j}")
+                    
+        st.write("### 2. Ingrese las Respuestas del Sistema $(x, y, z)$:")
+        c1, c2, c3 = st.columns(3)
+        with c1: rx = st.number_input("x:", value=0.00, format="%.2f", key="mn_gj_rx")
+        with c2: ry = st.number_input("y:", value=0.00, format="%.2f", key="mn_gj_ry")
+        with c3: rz = st.number_input("z:", value=0.00, format="%.2f", key="mn_gj_rz")
         
-        if st.button("Verificar Matriz U y Respuestas"):
-            if abs(r_u11 - U[1,1]) < 0.1 and abs(r_x0 - sol[0]) < 0.1:
-                st.success("¡Correcto! 🎉 Matriz U y Vector Respuestas verificados.")
-                st.latex(rf"U = {matrix_to_latex(U)}, \quad X = {matrix_to_latex(sol)}")
+        if st.button("Comprobar Gauss-Jordán (MN)"):
+            ok_mat = np.allclose(user_aug, Aug, atol=0.1)
+            ok_res = np.allclose([rx, ry, rz], sol, atol=0.1)
+            if ok_mat and ok_res:
+                st.success(f"¡Excelente! 🎉 Matriz triangulada y solución (x={sol[0]:.2f}, y={sol[1]:.2f}, z={sol[2]:.2f}) correctas.")
             else:
-                st.error("Incorrecto. ❌ Verifique la matriz U y la solución.")
-                st.latex(rf"U = {matrix_to_latex(U)}, \quad X = {matrix_to_latex(sol)}")
+                st.error("Incorrecto. ❌ Matriz triangulada exacta y solución:")
+                st.latex(rf"[U | d] = {matrix_to_latex(Aug)}")
+                st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
-    # 11. Inversión Matriz 3x3
-    elif tema_mn == "Inversión de Matriz (Tamaño 3x3)":
+    # 11. Descomposición LU por Doolittle / Crout
+    elif tema_mn == "Método de Descomposición LU por Doolittle / Crout":
+        metodo_lu = st.selectbox("📌 Seleccione Variación de Factorización LU:", ["Doolittle (Diag L = 1)", "Crout (Diag U = 1)"])
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_lu_a" not in st.session_state:
+            while True:
+                m = np.random.randint(1, 5, size=(3, 3))
+                b = np.random.randint(-10, 11, size=3)
+                if int(round(np.linalg.det(m))) != 0 and m[0,0] != 0:
+                    st.session_state.mn_lu_a = m.astype(float)
+                    st.session_state.mn_lu_b = b.astype(float)
+                    break
+            st.rerun()
+            
+        A, b = st.session_state.mn_lu_a, st.session_state.mn_lu_b
+        st.info(f"💡 **Instrucción:** Halle la Factorización LU por **{metodo_lu}**. Ingrese las matrices $L$, $U$ completas y las respuestas $(x, y, z)$.")
+        st.latex(rf"A = {matrix_to_latex(A)}, \quad b = {matrix_to_latex(b)}")
+        
+        if "Doolittle" in metodo_lu:
+            L = np.eye(3)
+            U = A.copy()
+            for i in range(3):
+                for j in range(i+1, 3):
+                    factor = U[j, i] / U[i, i]
+                    L[j, i] = factor
+                    U[j, i:] -= factor * U[i, i:]
+        else:
+            L = np.zeros((3, 3))
+            U = np.eye(3)
+            for i in range(3):
+                for j in range(i, 3):
+                    L[j, i] = A[j, i] - sum(L[j, k] * U[k, i] for k in range(i))
+                for j in range(i + 1, 3):
+                    U[i, j] = (A[i, j] - sum(L[i, k] * U[k, j] for k in range(i))) / L[i, i]
+                    
+        sol = np.linalg.solve(A, b)
+        
+        st.write("### 1. Ingrese la Matriz L:")
+        user_L = np.zeros((3, 3))
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_L[i, j] = st.number_input(f"L[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"mn_lu_L_{i}_{j}")
+                    
+        st.write("### 2. Ingrese la Matriz U:")
+        user_U = np.zeros((3, 3))
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_U[i, j] = st.number_input(f"U[{i+1},{j+1}]", value=0.00, format="%.2f", key=f"mn_lu_U_{i}_{j}")
+                    
+        st.write("### 3. Ingrese las Respuestas del Sistema $(x, y, z)$:")
+        c1, c2, c3 = st.columns(3)
+        with c1: rx = st.number_input("x:", value=0.00, format="%.2f", key="mn_lu_rx")
+        with c2: ry = st.number_input("y:", value=0.00, format="%.2f", key="mn_lu_ry")
+        with c3: rz = st.number_input("z:", value=0.00, format="%.2f", key="mn_lu_rz")
+        
+        if st.button("Verificar LU y Respuestas (MN)"):
+            ok_L = np.allclose(user_L, L, atol=0.1)
+            ok_U = np.allclose(user_U, U, atol=0.1)
+            ok_sol = np.allclose([rx, ry, rz], sol, atol=0.1)
+            if ok_L and ok_U and ok_sol:
+                st.success("¡Excelente! 🎉 Matrices L, U y solución verificadas con éxito.")
+            else:
+                st.error("Incorrecto. ❌ Matrices exactas y solución:")
+                st.latex(rf"L = {matrix_to_latex(L)}, \quad U = {matrix_to_latex(U)}")
+                st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
+
+    # 12. Inversión Matriz 3x3 (MN)
+    elif tema_mn == "Inversión de Matriz (Verificación Completa 3x3)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_inv3" not in st.session_state:
             while True:
                 m = np.random.randint(-3, 4, size=(3, 3))
@@ -663,38 +920,51 @@ else:
             st.rerun()
             
         A = st.session_state.mn_inv3
-        st.info("💡 **Instrucción:** Halle la matriz inversa $A^{-1}$ e ingrese la traza $\\text{tr}(A^{-1})$.")
+        st.info("💡 **Instrucción:** Halle la matriz inversa $A^{-1}$ completa para la matriz $A$ de $3 \\times 3$.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
         invA = np.linalg.inv(A)
-        traza_inv = float(np.trace(invA))
+        user_inv = np.zeros((3, 3))
+        st.write("### Ingrese la Matriz Inversa $A^{-1}$ completa:")
+        for i in range(3):
+            cols = st.columns(3)
+            for j in range(3):
+                with cols[j]:
+                    user_inv[i, j] = st.number_input(f"A⁻¹[{i+1},{j+1}]", value=0.0000, format="%.4f", key=f"mn_inv_{i}_{j}")
         
-        r_tr = st.number_input("Traza de A^(-1):", value=0.0000, format="%.4f")
-        if st.button("Comprobar Inversión"):
-            if abs(r_tr - traza_inv) < 0.05:
-                st.success(f"¡Excelente! 🎉 Traza de A^(-1) = {traza_inv:.4f}")
+        if st.button("Comprobar Matriz Inversa Completa (MN)"):
+            if np.allclose(user_inv, invA, atol=0.05):
+                st.success("¡Excelente! 🎉 Toda la Matriz Inversa es correcta.")
                 st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
             else:
-                st.error(f"Incorrecto. ❌ Traza exacta = {traza_inv:.4f}")
+                st.error("Incorrecto. ❌ Matriz Inversa exacta:")
+                st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
 
-    # 12. Polinomio Característico
-    elif tema_mn == "Método del Polinomio Característico (≥ 3x3)":
+    # 13. Polinomio Característico (MN)
+    elif tema_mn == "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pc_m" not in st.session_state:
-            m = np.random.randint(-2, 3, size=(3, 3))
-            st.session_state.mn_pc_m = (m + m.T).astype(float)
+            st.session_state.mn_pc_m = generar_matriz_con_dos_ceros_fuera_diag()
             st.rerun()
             
         A = st.session_state.mn_pc_m
-        st.info("💡 **Instrucción:** Determine la traza $\\text{tr}(A)$ coincidente con la suma de los autovalores.")
+        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$ (que posee exactamente 2 ceros fuera de la diagonal), halle su polinomio característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ y determine la traza $\\text{tr}(A) = c_2$ y el determinante $\\det(A) = c_0$.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
-        traza = int(np.trace(A))
-        r_tr = st.number_input("Traza tr(A):", value=0.0, step=1.0)
-        if st.button("Comprobar Traza"):
-            if int(r_tr) == traza: st.success(f"¡Excelente! 🎉 traza(A) = {traza}")
-            else: st.error(f"Incorrecto. ❌ La traza exacta es {traza}")
+        c2 = float(np.trace(A))
+        c0 = float(np.linalg.det(A))
+        vals = np.linalg.eigvals(A)
+        
+        c1_col, c2_col = st.columns(2)
+        with c1_col: r_c2 = st.number_input("Coeficiente c2 (Traza = sum(λ)):", value=0.0, step=1.0, key="mn_c2")
+        with c2_col: r_c0 = st.number_input("Término c0 (Determinante det(A)):", value=0.0, step=1.0, key="mn_c0")
+        
+        if st.button("Verificar Polinomio Característico (MN)"):
+            if abs(r_c2 - c2) < 0.1 and abs(r_c0 - c0) < 0.1:
+                st.success(f"¡Verificación Correcta! 🎉 c2 (Traza) = {c2:.1f}, c0 (det) = {c0:.1f}.\n Eigenvalores: {[round(x,2) for x in vals]}")
+            else:
+                st.error(f"Incorrecto. ❌ Valores exactos: c2 (Traza) = {c2:.1f}, c0 (det(A)) = {c0:.1f}")
 
-    # 13. Iteración Matricial 5x5
+    # 14. Iteración Matricial 5x5
     elif tema_mn == "Método de Iteración Matricial (Tamaño 5x5)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pot5" not in st.session_state:
             m = np.random.randint(1, 4, size=(5, 5))
@@ -716,7 +986,7 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ Valor máximo exacto = {max_y1:.2f}")
 
-    # 14. Regresión Lineal
+    # 15. Regresión Lineal
     elif tema_mn == "Regresión Lineal (5 datos)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_reg_x" not in st.session_state:
             st.session_state.mn_reg_x = np.array([1, 2, 3, 4, 5], dtype=float)
@@ -738,7 +1008,7 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ Polinomio exacto: P_1(x) = {a1:.4f} x + {a0:.4f}")
 
-    # 15. Regresión Cuadrática
+    # 16. Regresión Cuadrática
     elif tema_mn == "Regresión Cuadrática (5 datos)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_rc_x" not in st.session_state:
             st.session_state.mn_rc_x = np.array([1, 2, 3, 4, 5], dtype=float)
@@ -757,7 +1027,7 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ a2 exacto = {a2:.4f}")
 
-    # 16. Regresión Exponencial
+    # 17. Regresión Exponencial
     elif tema_mn == "Regresión Exponencial (5 datos)":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_re_x" not in st.session_state:
             st.session_state.mn_re_x = np.array([1, 2, 3, 4, 5], dtype=float)
@@ -776,47 +1046,35 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ B exacto = {B:.4f}")
 
-    # 17. Interpolación Lagrange
-    elif tema_mn == "Interpolación por Lagrange (4 datos)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_lag_x" not in st.session_state:
-            st.session_state.mn_lag_x = np.array([0, 1, 2, 3], dtype=float)
-            st.session_state.mn_lag_y = np.array([1, 3, 0, 5], dtype=float) + np.random.randint(-1, 2, size=4)
+    # 18. Interpolación Polinómica Única
+    elif tema_mn == "Interpolación Polinómica Única (5 datos - 4 Coeficientes)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pu5_x" not in st.session_state:
+            st.session_state.mn_pu5_x = np.array([0, 1, 2, 3, 4], dtype=float)
+            st.session_state.mn_pu5_y = np.array([2, 1, 4, 3, 6], dtype=float) + np.random.randint(-1, 2, size=5)
             st.rerun()
             
-        x, y = st.session_state.mn_lag_x, st.session_state.mn_lag_y
-        st.info("💡 **Instrucción:** Para los 4 datos, halle $P_3(x) = c_3 x^3 + c_2 x^2 + c_1 x + c_0$ y verifique el término independiente $c_0$.")
-        st.dataframe(pd.DataFrame({"x": x, "y": y}), use_container_width=True)
-        
-        coeffs = np.polyfit(x, y, 3)
-        c0 = coeffs[-1]
-        
-        r_c0 = st.number_input("Término independiente c0:", value=0.0000, format="%.4f")
-        if st.button("Verificar Coeficientes de Lagrange"):
-            if abs(r_c0 - c0) < 0.05:
-                st.success(f"¡Coeficiente Verificado! 🎉 c0 = {c0:.4f}\n Polinomio: {[round(k,4) for k in coeffs]}")
-            else:
-                st.error(f"Incorrecto. ❌ c0 exacto = {c0:.4f}")
-
-    # 18. Interpolación Polinomio Único
-    elif tema_mn == "Interpolación por Polinomio Único (5 datos)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pu_x" not in st.session_state:
-            st.session_state.mn_pu_x = np.array([0, 1, 2, 3, 4], dtype=float)
-            st.session_state.mn_pu_y = np.array([2, 1, 4, 3, 6], dtype=float) + np.random.randint(-1, 2, size=5)
-            st.rerun()
-            
-        x, y = st.session_state.mn_pu_x, st.session_state.mn_pu_y
-        st.info("💡 **Instrucción:** Mediante Vandermonde $5 \\times 5$, determine $P_4(x) = a_4 x^4 + a_3 x^3 + a_2 x^2 + a_1 x + a_0$ y verifique $a_0$.")
+        x, y = st.session_state.mn_pu5_x, st.session_state.mn_pu5_y
+        st.info("💡 **Instrucción:** Dados los 5 puntos experimentales, determine el único polinomio interpolador de 4to grado: $P_4(x) = a_4 x^4 + a_3 x^3 + a_2 x^2 + a_1 x + a_0$ e ingrese todos sus coeficientes.")
         st.dataframe(pd.DataFrame({"x": x, "y": y}), use_container_width=True)
         
         coeffs = np.polyfit(x, y, 4)
-        a0 = coeffs[-1]
+        a4, a3, a2, a1, a0 = coeffs
         
-        r_a0 = st.number_input("Término independiente a0:", value=0.0000, format="%.4f")
-        if st.button("Verificar Polinomio Único"):
-            if abs(r_a0 - a0) < 0.05:
-                st.success(f"¡Coeficiente Verificado! 🎉 a0 = {a0:.4f}\n Coeficientes [a4..a0]: {[round(k,4) for k in coeffs]}")
+        c1, c2, c3 = st.columns(3)
+        with c1: r_a4 = st.number_input("a4 (x^4):", value=0.0000, format="%.4f")
+        with c2: r_a3 = st.number_input("a3 (x^3):", value=0.0000, format="%.4f")
+        with c3: r_a2 = st.number_input("a2 (x^2):", value=0.0000, format="%.4f")
+        
+        c4, c5 = st.columns(2)
+        with c4: r_a1 = st.number_input("a1 (x^1):", value=0.0000, format="%.4f")
+        with c5: r_a0 = st.number_input("a0 (término indep.):", value=0.0000, format="%.4f")
+        
+        if st.button("Verificar Coeficientes del Polinomio Interpolador"):
+            user_coeffs = np.array([r_a4, r_a3, r_a2, r_a1, r_a0])
+            if np.allclose(user_coeffs, coeffs, atol=0.05):
+                st.success(f"¡Polinomio Verificado! 🎉 P_4(x) = {a4:.4f}x⁴ + {a3:.4f}x³ + {a2:.4f}x² + {a1:.4f}x + {a0:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ a0 exacto = {a0:.4f}")
+                st.error(f"Incorrecto. ❌ Coeficientes exactos: a4={a4:.4f}, a3={a3:.4f}, a2={a2:.4f}, a1={a1:.4f}, a0={a0:.4f}")
 
     # 19. Sistema No Lineal
     elif tema_mn == "Sistema No Lineal por Newton-Raphson (Verificación 3ra Iteración)":
@@ -853,28 +1111,38 @@ else:
                 st.error(f"Incorrecto. ❌ En la 3ra iteración el par exacto es (x3, y3) = ({x_k:.4f}, {y_k:.4f})")
 
     # 20. Simpson Compuesto
-    elif tema_mn == "Aproximación de Integrales (Simpson Compuesto)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_simp_n" not in st.session_state:
+    elif tema_mn == "Aproximación de Integrales (Simpson Compuesto - Raíz Cuadrada / Cúbica)":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_simp_tipo" not in st.session_state:
+            st.session_state.mn_simp_tipo = str(np.random.choice(["sqrt", "cbrt"]))
             st.session_state.mn_simp_n = int(np.random.choice([4, 6, 8]))
             st.rerun()
+            
+        tipo_root = st.session_state.mn_simp_tipo
         n_sub = st.session_state.mn_simp_n
-        b_val = 2.0
-        h = b_val / n_sub
-        st.info(f"💡 **Instrucción:** Evalúe la integral aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
-        st.latex(rf"\int_0^2 x^3 \, dx")
+        a_val, b_val = 1.0, 9.0
+        h = (b_val - a_val) / n_sub
         
-        x_pts = np.linspace(0, b_val, n_sub + 1)
-        f_pts = x_pts**3
+        if tipo_root == "sqrt":
+            st.info(f"💡 **Instrucción (Raíz Cuadrada):** Evalúe la integral $\\int_1^9 \\sqrt{{x}} \\, dx$ aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
+            st.latex(rf"\int_1^9 \sqrt{{x}} \, dx")
+            f_func = lambda x: np.sqrt(x)
+        else:
+            st.info(f"💡 **Instrucción (Raíz Cúbica):** Evalúe la integral $\\int_1^9 \\sqrt[3]{{x}} \\, dx$ aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
+            st.latex(rf"\int_1^9 \sqrt[3]{{x}} \, dx")
+            f_func = lambda x: np.cbrt(x)
+            
+        x_pts = np.linspace(a_val, b_val, n_sub + 1)
+        f_pts = f_func(x_pts)
         simp_val = (h/3.0) * (f_pts[0] + f_pts[-1] + 4*sum(f_pts[1:-1:2]) + 2*sum(f_pts[2:-1:2]))
         
-        r_s = st.number_input("Valor de la integral por Simpson:", value=0.0000, format="%.4f")
+        r_s = st.number_input("Valor de la integral por Simpson 1/3:", value=0.0000, format="%.4f")
         if st.button("Comprobar Simpson 1/3"):
             if abs(r_s - simp_val) < 0.01:
-                st.success(f"¡Excelente! 🎉 Integral = {simp_val:.4f}")
+                st.success(f"¡Excelente! 🎉 Integral por Simpson 1/3 = {simp_val:.4f}")
             else:
                 st.error(f"Incorrecto. ❌ El valor exacto por Simpson 1/3 es {simp_val:.4f}")
 
-    # 21. EDO Euler Modificado (CORREGIDO AL ESTILO dy/dx = 4x + 5y - 3x^2 + 4y^2 - e^(2x))
+    # 21. EDO Euler Modificado
     elif tema_mn == "EDO - Método de Euler Modificado":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_eul_params" not in st.session_state:
             st.session_state.mn_eul_params = {
@@ -906,7 +1174,7 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ El valor exacto por Euler Modificado es y({x_target}) = {y1:.4f}")
 
-    # 22. EDO Taylor (CORREGIDO AL ESTILO dy/dx = 4x + 5y)
+    # 22. EDO Taylor
     elif tema_mn == "EDO - Método de Taylor":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_tay_params" not in st.session_state:
             st.session_state.mn_tay_params = {
@@ -923,8 +1191,6 @@ else:
         st.info(f"💡 **Instrucción:** Para la EDO con $y({x0}) = {y0}$ y paso $h = {h}$, aplique el Método de Taylor de Orden 2: $y_1 = y_0 + h y'_0 + \\frac{{h^2}}{{2}} y''_0$ para aproximar $y({x_target})$.")
         st.latex(rf"\frac{{dy}}{{dx}} = 4x + 5y")
         
-        # dy/dx = 4x + 5y -> y' = 4x + 5y
-        # y'' = d/dx(4x + 5y) = 4 + 5y' = 4 + 5(4x + 5y)
         yp0 = 4*x0 + 5*y0
         ypp0 = 4 + 5*yp0
         y1 = y0 + h*yp0 + (h**2 / 2.0)*ypp0
@@ -936,7 +1202,7 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ El valor exacto es y({x_target}) = {y1:.4f}")
 
-    # 23. EDO RK4 (CORREGIDO AL ESTILO dy/dx = 4x + 5y - 3x^2 + 4y^2 - e^(2x))
+    # 23. EDO RK4
     else:
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_rk4_params" not in st.session_state:
             st.session_state.mn_rk4_params = {
@@ -947,7 +1213,7 @@ else:
             st.rerun()
             
         p = st.session_state.mn_rk4_params
-        h, x0, y0 = p["h"], p["x0"], p["y0"]
+        h, x0, y0 = p["h"], p["y0"], p["x0"]
         x_target = round(x0 + h, 2)
         
         def f_edo(x, y):
