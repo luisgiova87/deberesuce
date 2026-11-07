@@ -10,7 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilos personalizados
 st.markdown("""
     <style>
     .main-header { font-size: 2.2rem; color: #1F4E79; font-weight: 700; text-align: center; margin-bottom: 0px; }
@@ -40,41 +39,54 @@ def matrix_to_latex(arr):
 
 def generar_matriz_con_dos_ceros_fuera_diag():
     while True:
-        m = np.random.randint(-5, 6, size=(3, 3))
-        np.fill_diagonal(m, np.random.randint(1, 6, size=3) * np.random.choice([-1, 1], size=3))
+        m = np.random.randint(-4, 5, size=(3, 3))
+        np.fill_diagonal(m, np.random.randint(1, 5, size=3) * np.random.choice([-1, 1], size=3))
         off_diag_indices = [(0,1), (0,2), (1,0), (1,2), (2,0), (2,1)]
         zeros_idx = np.random.choice(len(off_diag_indices), size=2, replace=False)
         for idx in zeros_idx:
             r, c = off_diag_indices[idx]
             m[r, c] = 0
-        non_zeros_off = sum(1 for (r, c) in off_diag_indices if m[r, c] == 0)
-        if non_zeros_off == 2 and int(round(np.linalg.det(m))) != 0:
+        if int(round(np.linalg.det(m))) != 0:
             return m.astype(float)
+
+# Función auxiliar para obtener coeficientes del polinomio característico P(λ) = det(A - λI) = -λ³ + c₂λ² + c₁λ + c₀
+def calcular_coeficientes_pc(A):
+    # det(λI - A) = λ³ - c₂λ² - c₁λ - c₀ => P(λ) = det(A - λI) = -λ³ + c₂λ² + c₁λ + c₀
+    c2 = float(np.trace(A))
+    c0 = float(np.linalg.det(A))
+    # c1 = 1/2 * (tr(A)^2 - tr(A^2)) en la forma det(λI-A) = λ³ - c2 λ² + c1 λ - c0... 
+    # Para det(A - λI) = -λ³ + c2 λ² + c1 λ + c0:
+    # Coeficiente de λ: c1 = - (M11 + M22 + M33) donde Mii son los menores principales de 2x2.
+    m11 = A[1,1]*A[2,2] - A[1,2]*A[2,1]
+    m22 = A[0,0]*A[2,2] - A[0,2]*A[2,0]
+    m33 = A[0,0]*A[1,1] - A[0,1]*A[1,0]
+    c1 = -(m11 + m22 + m33)
+    return c2, c1, c0
 
 # ==========================================
 # ÁLGEBRA LINEAL
 # ==========================================
 if asignatura == "Álgebra Lineal":
     temas_al_lista = [
-        "Vectores en el plano (Punto y Proyecciones)",
-        "Vectores en el espacio (Cruz y Proyecciones)",
-        "Suma de Matrices (Verificación Completa)",
-        "Multiplicación de Matrices (Verificación Completa)",
-        "Determinantes (Tamaño mínimo 4x4)",
-        "Cálculo de la Matriz Inversa (Verificación Completa 3x3)",
-        "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)",
-        "Regla de Cramer (Sistema 3x3)",
-        "Factorización LU por Doolittle (Sistema 3x3)",
-        "Método Gauss-Seidel (Verificación 3ra Iteración)",
-        "Independencia Lineal (Subespacios)",
-        "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)"
+        "Vectores en el Plano",
+        "Vectores en el Espacio",
+        "Suma de Matrices",
+        "Multiplicación de Matrices",
+        "Determinantes",
+        "Matriz Inversa",
+        "Método de Gauss-Jordán",
+        "Regla de Cramer",
+        "Factorización LU por Doolittle",
+        "Método de Gauss-Seidel",
+        "Independencia Lineal",
+        "Polinomio Característico"
     ]
     
     if "tema_al" not in st.session_state:
         st.session_state.tema_al = temas_al_lista[0]
         
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎯 Seleccione un Tema (Botones):")
+    st.sidebar.markdown("### 🎯 Seleccione un Tema:")
     for t in temas_al_lista:
         btn_label = f"👉 {t}" if st.session_state.tema_al == t else t
         if st.sidebar.button(btn_label, key=f"btn_al_{t}", use_container_width=True):
@@ -85,7 +97,7 @@ if asignatura == "Álgebra Lineal":
     st.markdown(f"## 📐 Álgebra Lineal — {tema_al}")
     
     # 1. Vectores Plano
-    if tema_al == "Vectores en el plano (Punto y Proyecciones)":
+    if tema_al == "Vectores en el Plano":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_v2d_u" not in st.session_state:
             st.session_state.al_v2d_u = np.random.randint(-6, 7, size=2)
             st.session_state.al_v2d_v = np.random.randint(-6, 7, size=2)
@@ -114,7 +126,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Respuesta Incorrecta. ❌\n- Producto Punto exacto: {p_punto}\n- Proyección exacta: ({proj[0]:.4f}, {proj[1]:.4f})")
 
     # 2. Vectores Espacio
-    elif tema_al == "Vectores en el espacio (Cruz y Proyecciones)":
+    elif tema_al == "Vectores en el Espacio":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_v3d_u" not in st.session_state:
             st.session_state.al_v3d_u = np.random.randint(-5, 6, size=3)
             st.session_state.al_v3d_v = np.random.randint(-5, 6, size=3)
@@ -156,7 +168,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Respuesta Incorrecta. ❌\n- Producto Cruz exacto: [{cruz[0]}, {cruz[1]}, {cruz[2]}]\n- Proyección exacta: [{proj[0]:.4f}, {proj[1]:.4f}, {proj[2]:.4f}]")
 
     # 3. Suma de Matrices
-    elif tema_al == "Suma de Matrices (Verificación Completa)":
+    elif tema_al == "Suma de Matrices":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_m_a_sum" not in st.session_state:
             st.session_state.al_m_a_sum = np.random.randint(-5, 6, size=(3, 3))
             st.session_state.al_m_b_sum = np.random.randint(-5, 6, size=(3, 3))
@@ -185,7 +197,7 @@ if asignatura == "Álgebra Lineal":
                 st.latex(rf"S_{{\text{{exacta}}}} = {matrix_to_latex(S)}")
 
     # 4. Multiplicación de Matrices
-    elif tema_al == "Multiplicación de Matrices (Verificación Completa)":
+    elif tema_al == "Multiplicación de Matrices":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_m_a_mult" not in st.session_state:
             st.session_state.al_m_a_mult = np.random.randint(-4, 5, size=(3, 3))
             st.session_state.al_m_b_mult = np.random.randint(-4, 5, size=(3, 3))
@@ -213,8 +225,8 @@ if asignatura == "Álgebra Lineal":
                 st.error("Incorrecto. ❌ Verifique los elementos ingresados.")
                 st.latex(rf"P_{{\text{{exacta}}}} = {matrix_to_latex(P)}")
 
-    # 5. Determinantes 4x4
-    elif tema_al == "Determinantes (Tamaño mínimo 4x4)":
+    # 5. Determinantes
+    elif tema_al == "Determinantes":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_det4" not in st.session_state:
             st.session_state.al_det4 = np.random.randint(-3, 4, size=(4, 4))
             st.rerun()
@@ -233,7 +245,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Incorrecto. ❌ El determinante exacto es {det_exacto}")
 
     # 6. Matriz Inversa
-    elif tema_al == "Cálculo de la Matriz Inversa (Verificación Completa 3x3)":
+    elif tema_al == "Matriz Inversa":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_inv3" not in st.session_state:
             while True:
                 m = np.random.randint(-3, 4, size=(3, 3))
@@ -263,8 +275,8 @@ if asignatura == "Álgebra Lineal":
                 st.error("Incorrecto. ❌ Matriz Inversa exacta:")
                 st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
 
-    # 7. Gauss-Jordán 3x3
-    elif tema_al == "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)":
+    # 7. Gauss-Jordán
+    elif tema_al == "Método de Gauss-Jordán":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_gj_a" not in st.session_state:
             while True:
                 a = np.random.randint(-4, 5, size=(3, 3))
@@ -311,8 +323,8 @@ if asignatura == "Álgebra Lineal":
                 st.latex(rf"[U | d] = {matrix_to_latex(Aug)}")
                 st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
-    # 8. Regla de Cramer 3x3
-    elif tema_al == "Regla de Cramer (Sistema 3x3)":
+    # 8. Regla de Cramer
+    elif tema_al == "Regla de Cramer":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_cr_a" not in st.session_state:
             while True:
                 a = np.random.randint(-4, 5, size=(3, 3))
@@ -341,7 +353,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Incorrecto. ❌ Valores exactos: Δ = {det_sys}, y = {sol[1]:.2f}")
 
     # 9. Factorización LU por Doolittle
-    elif tema_al == "Factorización LU por Doolittle (Sistema 3x3)":
+    elif tema_al == "Factorización LU por Doolittle":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_doolittle_a" not in st.session_state:
             while True:
                 m = np.random.randint(1, 5, size=(3, 3))
@@ -401,7 +413,7 @@ if asignatura == "Álgebra Lineal":
                 st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
     # 10. Gauss-Seidel
-    elif tema_al == "Método Gauss-Seidel (Verificación 3ra Iteración)":
+    elif tema_al == "Método de Gauss-Seidel":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_gs3_a" not in st.session_state:
             st.session_state.al_gs3_a = np.array([[12, -2, 1], [-1, 10, -2], [2, -1, 11]], dtype=float)
             st.session_state.al_gs3_b = np.random.randint(-15, 16, size=3).astype(float)
@@ -429,7 +441,7 @@ if asignatura == "Álgebra Lineal":
                 st.error(f"Incorrecto. ❌ Valores exactos en la 3ra iteración: x^(3) = {x_k:.4f}, y^(3) = {y_k:.4f}, z^(3) = {z_k:.4f}")
 
     # 11. Independencia Lineal
-    elif tema_al == "Independencia Lineal (Subespacios)":
+    elif tema_al == "Independencia Lineal":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "al_ind_v" not in st.session_state:
             st.session_state.al_ind_v = [np.random.randint(-4, 5, size=3) for _ in range(3)]
             st.rerun()
@@ -457,58 +469,78 @@ if asignatura == "Álgebra Lineal":
             st.rerun()
             
         A = st.session_state.al_pc_mat
-        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$ (que posee exactamente 2 ceros fuera de la diagonal), halle su polinomio característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ y determine la traza $\\text{tr}(A) = c_2$ y el determinante $\\det(A) = c_0$.")
+        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$, determine el Polinomio Característico completo $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ (verificando $c_2, c_1, c_0$) y el **autovector normalizado (unitario)** correspondiente al mayor eigenvalor $\\lambda_{\\max}$.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
-        c2 = float(np.trace(A))
-        c0 = float(np.linalg.det(A))
-        vals = np.linalg.eigvals(A)
+        c2, c1, c0 = calcular_coeficientes_pc(A)
+        vals, vecs = np.linalg.eig(A)
         
-        c1_col, c2_col = st.columns(2)
-        with c1_col: r_c2 = st.number_input("Coeficiente c2 (Traza = sum(λ)):", value=0.0, step=1.0)
-        with c2_col: r_c0 = st.number_input("Término c0 (Determinante det(A)):", value=0.0, step=1.0)
+        # Seleccionar mayor eigenvalor real / módulo
+        idx_max = np.argmax(np.real(vals))
+        lambda_max = float(np.real(vals[idx_max]))
+        vec_max = np.real(vecs[:, idx_max])
+        vec_max = vec_max / np.linalg.norm(vec_max) # Normalizado unitario
         
-        if st.button("Verificar Polinomio Característico"):
-            if abs(r_c2 - c2) < 0.1 and abs(r_c0 - c0) < 0.1:
-                st.success(f"¡Verificación Correcta! 🎉 c2 (Traza) = {c2:.1f}, c0 (det) = {c0:.1f}.\n Eigenvalores: {[round(x,2) for x in vals]}")
+        st.write("### 1. Coeficientes del Polinomio Característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0$:")
+        cc1, cc2, cc3 = st.columns(3)
+        with cc1: r_c2 = st.number_input("Coeficiente c2 (Traza):", value=0.0000, format="%.4f", key="al_pc_c2")
+        with cc2: r_c1 = st.number_input("Coeficiente c1:", value=0.0000, format="%.4f", key="al_pc_c1")
+        with cc3: r_c0 = st.number_input("Término c0 (Determinante):", value=0.0000, format="%.4f", key="al_pc_c0")
+        
+        st.write(f"### 2. Eigenvector (Autovector Unitario) del Mayor Eigenvalor (λ_max ≈ {lambda_max:.4f}):")
+        ev1, ev2, ev3 = st.columns(3)
+        with ev1: r_v1 = st.number_input("v1 (Componente X):", value=0.0000, format="%.4f", key="al_ev1")
+        with ev2: r_v2 = st.number_input("v2 (Componente Y):", value=0.0000, format="%.4f", key="al_ev2")
+        with ev3: r_v3 = st.number_input("v3 (Componente Z):", value=0.0000, format="%.4f", key="al_ev3")
+        
+        if st.button("Verificar Polinomio Característico y Eigenvector"):
+            ok_c2 = abs(r_c2 - c2) < 0.05
+            ok_c1 = abs(r_c1 - c1) < 0.05
+            ok_c0 = abs(r_c0 - c0) < 0.05
+            
+            user_v = np.array([r_v1, r_v2, r_v3])
+            ok_v = np.allclose(user_v, vec_max, atol=0.08) or np.allclose(user_v, -vec_max, atol=0.08)
+            
+            if ok_c2 and ok_c1 and ok_c0 and ok_v:
+                st.success(f"¡Verificación Correcta! 🎉\n- Coeficientes: c2 = {c2:.4f}, c1 = {c1:.4f}, c0 = {c0:.4f}\n- Eigenvalor Máximo: λ_max = {lambda_max:.4f}\n- Eigenvector Unitario: [{vec_max[0]:.4f}, {vec_max[1]:.4f}, {vec_max[2]:.4f}]")
             else:
-                st.error(f"Incorrecto. ❌ Valores exactos: c2 (Traza) = {c2:.1f}, c0 (det(A)) = {c0:.1f}")
+                st.error(f"Incorrecto. ❌ Valores exactos:\n- Coeficientes: c2 = {c2:.4f}, c1 = {c1:.4f}, c0 = {c0:.4f}\n- Eigenvalor Máximo: λ_max = {lambda_max:.4f}\n- Eigenvector Unitario: [{vec_max[0]:.4f}, {vec_max[1]:.4f}, {vec_max[2]:.4f}] (o con signo opuesto)")
 
 # ==========================================
 # MÉTODOS NUMÉRICOS
 # ==========================================
 else:
     temas_mn_lista = [
-        "Series Numéricas (Seno / Coseno con Ángulos 10° a 359°)",
-        "Serie de Taylor (LN / Series Geométricas Alternadas)",
-        "Concepto de Errores y Sus Tipos",
-        "Cambio de Registro de Computadora de 32 bits a Decimal",
-        "Método de Bisección (Ecuaciones Polinómicas y Trigonométricas a la vez)",
-        "Método de Falsa Posición (Ecuaciones Polinómicas y Trigonométricas a la vez)",
-        "Método de Falsa Posición Modificada (Ecuaciones Polinómicas y Trigonométricas a la vez)",
-        "Método de Newton (Ecuaciones Polinómicas y Trigonométricas a la vez)",
-        "Método de la Secante (Ecuaciones Polinómicas y Trigonométricas a la vez)",
-        "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)",
-        "Método de Descomposición LU por Doolittle / Crout",
-        "Inversión de Matriz (Verificación Completa 3x3)",
-        "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)",
-        "Método de Iteración Matricial (Tamaño 5x5)",
-        "Regresión Lineal (5 datos)",
-        "Regresión Cuadrática (5 datos)",
-        "Regresión Exponencial (5 datos)",
-        "Interpolación Polinómica Única (5 datos - 4 Coeficientes)",
-        "Sistema No Lineal por Newton-Raphson (Verificación 3ra Iteración)",
-        "Aproximación de Integrales (Simpson Compuesto - Raíz Cuadrada / Cúbica)",
+        "Series Numéricas",
+        "Serie de Taylor",
+        "Concepto de Errores",
+        "Registro de Computadora IEEE 754",
+        "Método de Bisección",
+        "Método de Falsa Posición",
+        "Método de Falsa Posición Modificada",
+        "Método de Newton",
+        "Método de la Secante",
+        "Método de Gauss-Jordán",
+        "Descomposición LU",
+        "Matriz Inversa",
+        "Polinomio Característico",
+        "Iteración Matricial",
+        "Regresión Lineal",
+        "Regresión Cuadrática",
+        "Regresión Exponencial",
+        "Interpolación Polinómica Única",
+        "Sistema No Lineal por Newton-Raphson",
+        "Aproximación de Integrales por Simpson",
         "EDO - Método de Euler Modificado",
         "EDO - Método de Taylor",
-        "EDO - Runge-Kutta Orden 4"
+        "EDO - Runge-Kutta 4to Orden"
     ]
     
     if "tema_mn" not in st.session_state:
         st.session_state.tema_mn = temas_mn_lista[0]
         
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎯 Seleccione un Tema (Botones):")
+    st.sidebar.markdown("### 🎯 Seleccione un Tema:")
     for t in temas_mn_lista:
         btn_label = f"👉 {t}" if st.session_state.tema_mn == t else t
         if st.sidebar.button(btn_label, key=f"btn_mn_{t}", use_container_width=True):
@@ -519,7 +551,7 @@ else:
     st.markdown(f"## 🔢 Métodos Numéricos — {tema_mn}")
     
     # 1. Series numéricas
-    if tema_mn == "Series Numéricas (Seno / Coseno con Ángulos 10° a 359°)":
+    if tema_mn == "Series Numéricas":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_s5_deg" not in st.session_state:
             st.session_state.mn_s5_deg = int(np.random.randint(10, 360))
             st.session_state.mn_s5_tipo = str(np.random.choice(["seno", "coseno"]))
@@ -547,7 +579,7 @@ else:
                 st.error(f"Incorrecto. ❌ El valor exacto en la 5ta iteración es {s5:.6f}")
 
     # 2. Serie de Taylor
-    elif tema_mn == "Serie de Taylor (LN / Series Geométricas Alternadas)":
+    elif tema_mn == "Serie de Taylor":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_tay_func" not in st.session_state:
             st.session_state.mn_tay_func = str(np.random.choice(["ln", "geometrica"]))
             st.session_state.mn_tay_x = round(float(np.random.uniform(0.1, 0.5)), 2)
@@ -573,7 +605,7 @@ else:
                 st.error(f"Incorrecto. ❌ El valor exacto es {p4:.4f}")
 
     # 3. Errores
-    elif tema_mn == "Concepto de Errores y Sus Tipos":
+    elif tema_mn == "Concepto de Errores":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_err_v" not in st.session_state:
             st.session_state.mn_err_v = round(float(np.random.uniform(15.0, 45.0)), 2)
             st.session_state.mn_err_ap = round(st.session_state.mn_err_v + float(np.random.uniform(-1.5, 1.5)), 2)
@@ -595,7 +627,7 @@ else:
                 st.error(f"Incorrecto. ❌ Ea = {ea:.4f}, Er = {er:.4f}%")
 
     # 4. IEEE 754
-    elif tema_mn == "Cambio de Registro de Computadora de 32 bits a Decimal":
+    elif tema_mn == "Registro de Computadora IEEE 754":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_ieee_val" not in st.session_state:
             st.session_state.mn_ieee_val = float(np.random.choice([-12.5, 6.25, -0.75, 18.5, 4.125]))
             st.rerun()
@@ -615,7 +647,7 @@ else:
                 st.error(f"Incorrecto. ❌ Signo = {signo}, Exponente Sesgado E = {exp_bias}")
 
     # 5. Bisección
-    elif tema_mn == "Método de Bisección (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+    elif tema_mn == "Método de Bisección":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_bis_k" not in st.session_state:
             st.session_state.mn_bis_k = int(np.random.randint(1, 5))
             st.rerun()
@@ -650,7 +682,7 @@ else:
                 st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
 
     # 6. Falsa Posición
-    elif tema_mn == "Método de Falsa Posición (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+    elif tema_mn == "Método de Falsa Posición":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_fp_k" not in st.session_state:
             st.session_state.mn_fp_k = int(np.random.randint(1, 5))
             st.rerun()
@@ -686,7 +718,7 @@ else:
                 st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
 
     # 7. Falsa Posición Modificada
-    elif tema_mn == "Método de Falsa Posición Modificada (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+    elif tema_mn == "Método de Falsa Posición Modificada":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_fpm_k" not in st.session_state:
             st.session_state.mn_fpm_k = int(np.random.randint(1, 5))
             st.rerun()
@@ -731,7 +763,7 @@ else:
                 st.error(f"Incorrecto. ❌ Valores exactos: xr1={xr_vals[0]:.4f}, xr2={xr_vals[1]:.4f}, xr3={xr_vals[2]:.4f}")
 
     # 8. Newton
-    elif tema_mn == "Método de Newton (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+    elif tema_mn == "Método de Newton":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_nw_k" not in st.session_state:
             st.session_state.mn_nw_k = int(np.random.randint(1, 5))
             st.session_state.mn_nw_x0 = round(float(np.random.uniform(1.2, 2.0)), 2)
@@ -761,7 +793,7 @@ else:
                 st.error(f"Incorrecto. ❌ Valores exactos: x1={x_vals[0]:.4f}, x2={x_vals[1]:.4f}, x3={x_vals[2]:.4f}")
 
     # 9. Secante
-    elif tema_mn == "Método de la Secante (Ecuaciones Polinómicas y Trigonométricas a la vez)":
+    elif tema_mn == "Método de la Secante":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_sec_c" not in st.session_state:
             st.session_state.mn_sec_c = int(np.random.randint(1, 5))
             st.rerun()
@@ -792,8 +824,8 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ Valores exactos: x2={x_vals[0]:.4f}, x3={x_vals[1]:.4f}, x4={x_vals[2]:.4f}")
 
-    # 10. Gauss-Jordán 3x3 (MN)
-    elif tema_mn == "Método de Gauss-Jordán (Sistema 3x3 con Matriz Triangulada)":
+    # 10. Gauss-Jordán (MN)
+    elif tema_mn == "Método de Gauss-Jordán":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_gj_a" not in st.session_state:
             while True:
                 a = np.random.randint(-4, 5, size=(3, 3))
@@ -840,8 +872,8 @@ else:
                 st.latex(rf"[U | d] = {matrix_to_latex(Aug)}")
                 st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
-    # 11. Descomposición LU por Doolittle / Crout
-    elif tema_mn == "Método de Descomposición LU por Doolittle / Crout":
+    # 11. Descomposición LU
+    elif tema_mn == "Descomposición LU":
         metodo_lu = st.selectbox("📌 Seleccione Variación de Factorización LU:", ["Doolittle (Diag L = 1)", "Crout (Diag U = 1)"])
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_lu_a" not in st.session_state:
             while True:
@@ -910,7 +942,7 @@ else:
                 st.write(f"Solución exacta: x = {sol[0]:.2f}, y = {sol[1]:.2f}, z = {sol[2]:.2f}")
 
     # 12. Inversión Matriz 3x3 (MN)
-    elif tema_mn == "Inversión de Matriz (Verificación Completa 3x3)":
+    elif tema_mn == "Matriz Inversa":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_inv3" not in st.session_state:
             while True:
                 m = np.random.randint(-3, 4, size=(3, 3))
@@ -941,31 +973,50 @@ else:
                 st.latex(rf"A^{{-1}} = {matrix_to_latex(invA)}")
 
     # 13. Polinomio Característico (MN)
-    elif tema_mn == "Polinomio Característico (Matriz 3x3 con 2 ceros fuera de la diagonal)":
+    elif tema_mn == "Polinomio Característico":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pc_m" not in st.session_state:
             st.session_state.mn_pc_m = generar_matriz_con_dos_ceros_fuera_diag()
             st.rerun()
             
         A = st.session_state.mn_pc_m
-        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$ (que posee exactamente 2 ceros fuera de la diagonal), halle su polinomio característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ y determine la traza $\\text{tr}(A) = c_2$ y el determinante $\\det(A) = c_0$.")
+        st.info("💡 **Instrucción:** Para la matriz $A$ de $3 \\times 3$, determine todos los coeficientes del Polinomio Característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0 = 0$ y el **autovector normalizado (unitario)** correspondiente al mayor eigenvalor $\\lambda_{\\max}$.")
         st.latex(rf"A = {matrix_to_latex(A)}")
         
-        c2 = float(np.trace(A))
-        c0 = float(np.linalg.det(A))
-        vals = np.linalg.eigvals(A)
+        c2, c1, c0 = calcular_coeficientes_pc(A)
+        vals, vecs = np.linalg.eig(A)
         
-        c1_col, c2_col = st.columns(2)
-        with c1_col: r_c2 = st.number_input("Coeficiente c2 (Traza = sum(λ)):", value=0.0, step=1.0, key="mn_c2")
-        with c2_col: r_c0 = st.number_input("Término c0 (Determinante det(A)):", value=0.0, step=1.0, key="mn_c0")
+        idx_max = np.argmax(np.real(vals))
+        lambda_max = float(np.real(vals[idx_max]))
+        vec_max = np.real(vecs[:, idx_max])
+        vec_max = vec_max / np.linalg.norm(vec_max)
         
-        if st.button("Verificar Polinomio Característico (MN)"):
-            if abs(r_c2 - c2) < 0.1 and abs(r_c0 - c0) < 0.1:
-                st.success(f"¡Verificación Correcta! 🎉 c2 (Traza) = {c2:.1f}, c0 (det) = {c0:.1f}.\n Eigenvalores: {[round(x,2) for x in vals]}")
+        st.write("### 1. Coeficientes del Polinomio Característico $P(\\lambda) = -\\lambda^3 + c_2 \\lambda^2 + c_1 \\lambda + c_0$:")
+        cc1, cc2, cc3 = st.columns(3)
+        with cc1: r_c2 = st.number_input("Coeficiente c2 (Traza):", value=0.0000, format="%.4f", key="mn_pc_c2")
+        with cc2: r_c1 = st.number_input("Coeficiente c1:", value=0.0000, format="%.4f", key="mn_pc_c1")
+        with cc3: r_c0 = st.number_input("Término c0 (Determinante):", value=0.0000, format="%.4f", key="mn_pc_c0")
+        
+        st.write(f"### 2. Eigenvector (Autovector Unitario) del Mayor Eigenvalor (λ_max ≈ {lambda_max:.4f}):")
+        ev1, ev2, ev3 = st.columns(3)
+        with ev1: r_v1 = st.number_input("v1 (Componente X):", value=0.0000, format="%.4f", key="mn_ev1")
+        with ev2: r_v2 = st.number_input("v2 (Componente Y):", value=0.0000, format="%.4f", key="mn_ev2")
+        with ev3: r_v3 = st.number_input("v3 (Componente Z):", value=0.0000, format="%.4f", key="mn_ev3")
+        
+        if st.button("Verificar Polinomio Característico y Eigenvector (MN)"):
+            ok_c2 = abs(r_c2 - c2) < 0.05
+            ok_c1 = abs(r_c1 - c1) < 0.05
+            ok_c0 = abs(r_c0 - c0) < 0.05
+            
+            user_v = np.array([r_v1, r_v2, r_v3])
+            ok_v = np.allclose(user_v, vec_max, atol=0.08) or np.allclose(user_v, -vec_max, atol=0.08)
+            
+            if ok_c2 and ok_c1 and ok_c0 and ok_v:
+                st.success(f"¡Verificación Correcta! 🎉\n- Coeficientes: c2 = {c2:.4f}, c1 = {c1:.4f}, c0 = {c0:.4f}\n- Eigenvalor Máximo: λ_max = {lambda_max:.4f}\n- Eigenvector Unitario: [{vec_max[0]:.4f}, {vec_max[1]:.4f}, {vec_max[2]:.4f}]")
             else:
-                st.error(f"Incorrecto. ❌ Valores exactos: c2 (Traza) = {c2:.1f}, c0 (det(A)) = {c0:.1f}")
+                st.error(f"Incorrecto. ❌ Valores exactos:\n- Coeficientes: c2 = {c2:.4f}, c1 = {c1:.4f}, c0 = {c0:.4f}\n- Eigenvalor Máximo: λ_max = {lambda_max:.4f}\n- Eigenvector Unitario: [{vec_max[0]:.4f}, {vec_max[1]:.4f}, {vec_max[2]:.4f}] (o con signo opuesto)")
 
     # 14. Iteración Matricial 5x5
-    elif tema_mn == "Método de Iteración Matricial (Tamaño 5x5)":
+    elif tema_mn == "Iteración Matricial":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pot5" not in st.session_state:
             m = np.random.randint(1, 4, size=(5, 5))
             st.session_state.mn_pot5 = (m + m.T).astype(float)
@@ -987,67 +1038,83 @@ else:
                 st.error(f"Incorrecto. ❌ Valor máximo exacto = {max_y1:.2f}")
 
     # 15. Regresión Lineal
-    elif tema_mn == "Regresión Lineal (5 datos)":
+    elif tema_mn == "Regresión Lineal":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_reg_x" not in st.session_state:
             st.session_state.mn_reg_x = np.array([1, 2, 3, 4, 5], dtype=float)
             st.session_state.mn_reg_y = np.array([2.1, 3.8, 6.2, 7.9, 10.1], dtype=float) + np.random.uniform(-0.3, 0.3, size=5)
             st.rerun()
             
         x, y = st.session_state.mn_reg_x, st.session_state.mn_reg_y
-        st.info("💡 **Instrucción:** Ajuste la recta $y = P_1(x) = a_1 x + a_0$ y verifique los coeficientes $(a_1, a_0)$.")
+        st.info("💡 **Instrucción:** Ajuste el modelo de Regresión Lineal $y = a_1 x + a_0$ e ingrese **ambos coeficientes** ($a_1$ y $a_0$) con 4 decimales.")
         st.dataframe(pd.DataFrame({"x": x, "y": y}), use_container_width=True)
         
         a1, a0 = np.polyfit(x, y, 1)
         c1, c2 = st.columns(2)
-        with c1: r_a1 = st.number_input("Pendiente a1:", value=0.0000, format="%.4f")
-        with c2: r_a0 = st.number_input("Intersección a0:", value=0.0000, format="%.4f")
+        with c1: r_a1 = st.number_input("Pendiente (a1):", value=0.0000, format="%.4f")
+        with c2: r_a0 = st.number_input("Intersección / Término Independiente (a0):", value=0.0000, format="%.4f")
         
-        if st.button("Verificar Polinomio Lineal"):
-            if abs(r_a1 - a1) < 0.05 and abs(r_a0 - a0) < 0.05:
-                st.success(f"¡Polinomio Verificado! 🎉 P_1(x) = {a1:.4f} x + {a0:.4f}")
+        if st.button("Verificar Todos los Coeficientes (Regresión Lineal)"):
+            ok_a1 = abs(r_a1 - a1) < 0.05
+            ok_a0 = abs(r_a0 - a0) < 0.05
+            if ok_a1 and ok_a0:
+                st.success(f"¡Excelente! 🎉 Todos los coeficientes son correctos:\n- a1 = {a1:.4f}\n- a0 = {a0:.4f}\nEcuación: y = {a1:.4f} x + {a0:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ Polinomio exacto: P_1(x) = {a1:.4f} x + {a0:.4f}")
+                st.error(f"Incorrecto. ❌ Coeficientes exactos:\n- a1 (Pendiente) = {a1:.4f}\n- a0 (Intersección) = {a0:.4f}")
 
     # 16. Regresión Cuadrática
-    elif tema_mn == "Regresión Cuadrática (5 datos)":
+    elif tema_mn == "Regresión Cuadrática":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_rc_x" not in st.session_state:
             st.session_state.mn_rc_x = np.array([1, 2, 3, 4, 5], dtype=float)
             st.session_state.mn_rc_y = 0.5 * (st.session_state.mn_rc_x**2) + np.random.uniform(-0.2, 0.2, size=5)
             st.rerun()
             
         x, y = st.session_state.mn_rc_x, st.session_state.mn_rc_y
-        st.info("💡 **Instrucción:** Ajuste la parábola $y = P_2(x) = a_2 x^2 + a_1 x + a_0$ y verifique el coeficiente cuadrático $a_2$.")
+        st.info("💡 **Instrucción:** Ajuste la parábola de Regresión Cuadrática $y = a_2 x^2 + a_1 x + a_0$ e ingrese **todos los coeficientes** ($a_2, a_1, a_0$) con 4 decimales.")
         st.dataframe(pd.DataFrame({"x": x, "y": y}), use_container_width=True)
         
         a2, a1, a0 = np.polyfit(x, y, 2)
-        r_a2 = st.number_input("Coeficiente cuadrático a2:", value=0.0000, format="%.4f")
-        if st.button("Verificar Polinomio Cuadrático"):
-            if abs(r_a2 - a2) < 0.05:
-                st.success(f"¡Polinomio Verificado! 🎉 P_2(x) = {a2:.4f} x^2 + {a1:.4f} x + {a0:.4f}")
+        c1, c2, c3 = st.columns(3)
+        with c1: r_a2 = st.number_input("Coeficiente cuadrático (a2):", value=0.0000, format="%.4f")
+        with c2: r_a1 = st.number_input("Coeficiente lineal (a1):", value=0.0000, format="%.4f")
+        with c3: r_a0 = st.number_input("Término independiente (a0):", value=0.0000, format="%.4f")
+        
+        if st.button("Verificar Todos los Coeficientes (Regresión Cuadrática)"):
+            ok_a2 = abs(r_a2 - a2) < 0.05
+            ok_a1 = abs(r_a1 - a1) < 0.05
+            ok_a0 = abs(r_a0 - a0) < 0.05
+            if ok_a2 and ok_a1 and ok_a0:
+                st.success(f"¡Excelente! 🎉 Todos los coeficientes son correctos:\n- a2 = {a2:.4f}\n- a1 = {a1:.4f}\n- a0 = {a0:.4f}\nEcuación: y = {a2:.4f} x² + {a1:.4f} x + {a0:.4f}")
             else:
-                st.error(f"Incorrecto. ❌ a2 exacto = {a2:.4f}")
+                st.error(f"Incorrecto. ❌ Coeficientes exactos:\n- a2 = {a2:.4f}\n- a1 = {a1:.4f}\n- a0 = {a0:.4f}")
 
     # 17. Regresión Exponencial
-    elif tema_mn == "Regresión Exponencial (5 datos)":
+    elif tema_mn == "Regresión Exponencial":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_re_x" not in st.session_state:
             st.session_state.mn_re_x = np.array([1, 2, 3, 4, 5], dtype=float)
             st.session_state.mn_re_y = 2.0 * np.exp(0.4 * st.session_state.mn_re_x) + np.random.uniform(-0.1, 0.1, size=5)
             st.rerun()
             
         x, y = st.session_state.mn_re_x, st.session_state.mn_re_y
-        st.info("💡 **Instrucción:** Ajuste el modelo $y = A \\cdot e^{B x}$ mediante $\\ln(y) = \\ln(A) + B x$ y verifique la tasa $B$.")
+        st.info("💡 **Instrucción:** Ajuste el modelo de Regresión Exponencial $y = A \\cdot e^{B x}$ mediante linealización $\\ln(y) = \\ln(A) + B x$. Ingrese **todos los coeficientes del modelo final** ($A$ y $B$) con 4 decimales.")
         st.dataframe(pd.DataFrame({"x": x, "y": y}), use_container_width=True)
         
         B, lnA = np.polyfit(x, np.log(y), 1)
-        r_b = st.number_input("Tasa Exponencial B:", value=0.0000, format="%.4f")
-        if st.button("Verificar Modelo Exponencial"):
-            if abs(r_b - B) < 0.05:
-                st.success(f"¡Modelo Verificado! 🎉 y = {np.exp(lnA):.4f} * e^({B:.4f} x)")
+        A_val = np.exp(lnA)
+        
+        c1, c2 = st.columns(2)
+        with c1: r_A = st.number_input("Coeficiente de Amplitud (A):", value=0.0000, format="%.4f")
+        with c2: r_B = st.number_input("Tasa Exponencial (B):", value=0.0000, format="%.4f")
+        
+        if st.button("Verificar Todos los Coeficientes (Regresión Exponencial)"):
+            ok_A = abs(r_A - A_val) < 0.05
+            ok_B = abs(r_B - B) < 0.05
+            if ok_A and ok_B:
+                st.success(f"¡Excelente! 🎉 Todos los coeficientes son correctos:\n- A = {A_val:.4f}\n- B = {B:.4f}\nEcuación: y = {A_val:.4f} · e^({B:.4f} x)")
             else:
-                st.error(f"Incorrecto. ❌ B exacto = {B:.4f}")
+                st.error(f"Incorrecto. ❌ Coeficientes exactos:\n- A (Amplitud) = {A_val:.4f}\n- B (Tasa) = {B:.4f}")
 
     # 18. Interpolación Polinómica Única
-    elif tema_mn == "Interpolación Polinómica Única (5 datos - 4 Coeficientes)":
+    elif tema_mn == "Interpolación Polinómica Única":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_pu5_x" not in st.session_state:
             st.session_state.mn_pu5_x = np.array([0, 1, 2, 3, 4], dtype=float)
             st.session_state.mn_pu5_y = np.array([2, 1, 4, 3, 6], dtype=float) + np.random.randint(-1, 2, size=5)
@@ -1077,7 +1144,7 @@ else:
                 st.error(f"Incorrecto. ❌ Coeficientes exactos: a4={a4:.4f}, a3={a3:.4f}, a2={a2:.4f}, a1={a1:.4f}, a0={a0:.4f}")
 
     # 19. Sistema No Lineal
-    elif tema_mn == "Sistema No Lineal por Newton-Raphson (Verificación 3ra Iteración)":
+    elif tema_mn == "Sistema No Lineal por Newton-Raphson":
         if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_nl_c" not in st.session_state:
             st.session_state.mn_nl_c = int(np.random.randint(4, 9))
             st.rerun()
@@ -1110,26 +1177,22 @@ else:
             else:
                 st.error(f"Incorrecto. ❌ En la 3ra iteración el par exacto es (x3, y3) = ({x_k:.4f}, {y_k:.4f})")
 
-    # 20. Simpson Compuesto
-    elif tema_mn == "Aproximación de Integrales (Simpson Compuesto - Raíz Cuadrada / Cúbica)":
-        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_simp_tipo" not in st.session_state:
-            st.session_state.mn_simp_tipo = str(np.random.choice(["sqrt", "cbrt"]))
+    # 20. Simpson (Mixta Polinómica y Trigonométrica)
+    elif tema_mn == "Aproximación de Integrales por Simpson":
+        if st.button("🔄 Generar nuevos datos del ejercicio") or "mn_simp_k" not in st.session_state:
+            st.session_state.mn_simp_k = int(np.random.randint(1, 6))
             st.session_state.mn_simp_n = int(np.random.choice([4, 6, 8]))
             st.rerun()
             
-        tipo_root = st.session_state.mn_simp_tipo
+        k_val = st.session_state.mn_simp_k
         n_sub = st.session_state.mn_simp_n
-        a_val, b_val = 1.0, 9.0
+        a_val, b_val = 0.0, 3.0
         h = (b_val - a_val) / n_sub
         
-        if tipo_root == "sqrt":
-            st.info(f"💡 **Instrucción (Raíz Cuadrada):** Evalúe la integral $\\int_1^9 \\sqrt{{x}} \\, dx$ aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
-            st.latex(rf"\int_1^9 \sqrt{{x}} \, dx")
-            f_func = lambda x: np.sqrt(x)
-        else:
-            st.info(f"💡 **Instrucción (Raíz Cúbica):** Evalúe la integral $\\int_1^9 \\sqrt[3]{{x}} \\, dx$ aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
-            st.latex(rf"\int_1^9 \sqrt[3]{{x}} \, dx")
-            f_func = lambda x: np.cbrt(x)
+        st.info(f"💡 **Instrucción (Radicando Polinómico-Trigonométrico):** Evalúe la integral $\\int_0^3 \\sqrt{{x^2 + \\cos(x) + {k_val}}} \\, dx$ aplicando la Regla de Simpson 1/3 Compuesta con $n = {n_sub}$ subintervalos ($h = {h:.4f}$).")
+        st.latex(rf"\int_0^3 \sqrt{{x^2 + \cos(x) + {k_val}}} \, dx")
+        
+        f_func = lambda x: np.sqrt(x**2 + np.cos(x) + k_val)
             
         x_pts = np.linspace(a_val, b_val, n_sub + 1)
         f_pts = f_func(x_pts)
@@ -1213,7 +1276,7 @@ else:
             st.rerun()
             
         p = st.session_state.mn_rk4_params
-        h, x0, y0 = p["h"], p["y0"], p["x0"]
+        h, x0, y0 = p["h"], p["x0"], p["y0"]
         x_target = round(x0 + h, 2)
         
         def f_edo(x, y):
